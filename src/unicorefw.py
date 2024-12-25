@@ -4,9 +4,9 @@
 #                                                                      #
 # This file is part of UniCoreFW.                                      #
 # UniCore is free software: you can redistribute it and/or modify      #
-# it under the terms of the [BSD-3-Clause] as published by         #
+# it under the terms of the [BSD-3-Clause] as published by             #
 # the Free Software Foundation.                                        #
-# You should have received a copy of the [BSD-3-Clause] license    #
+# You should have received a copy of the [BSD-3-Clause] license        #
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.     #
 ########################################################################
 
