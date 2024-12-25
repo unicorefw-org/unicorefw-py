@@ -1,8 +1,8 @@
-# UnicoreFW-py - Unicore Framework in Python
+# UniCoreFW-py - Unicore Framework in Python
 * * *
 Overview
 --------
-UnicoreFW-PY, a part of UnicoreFW.org is a Python-based framework based on UnderscoreJS, designed to offer a comprehensive set of utilities and functional programming tools. This framework is equipped with command-line capabilities that allow users to execute example scripts, parse custom command-line arguments, and integrate powerful utility methods for various use cases. The goal of UnicoreFW is to provide security, performance, and ease of use for developers looking to build and maintain Python applications.
+UniCoreFW-PY, a part of UnicoreFW.org is a Python-based framework based on UnderscoreJS, designed to offer a comprehensive set of utilities and functional programming tools. This framework is equipped with command-line capabilities that allow users to execute example scripts, parse custom command-line arguments, and integrate powerful utility methods for various use cases. The goal of UnicoreFW is to provide security, performance, and ease of use for developers looking to build and maintain Python applications.
 
 
 Features
@@ -12,6 +12,10 @@ Features
 *   **Utility Functions**: Includes a robust set of utility methods for functional programming, string manipulation, and more.
 *   **Secure Execution**: Built-in security measures to safely execute code and handle user inputs.
 
+
+Installation from Pypi using PIP
+------------
+    pip install unicorefw
 
 Installation from source
 ------------
