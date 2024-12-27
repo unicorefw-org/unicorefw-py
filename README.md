@@ -42,10 +42,10 @@ Directory Structure
     ├── src/
     │   └── unicorefw.py
     ├── examples/
-    │   └── sets/            # list of examples
-    │   └── functions.py     # show examples of function usage
-    │   └── task_manager.py  # Sample implementations of UniCoreFW functions
-    │   └── underscore.py    # examples on how to use UniCoreFW as _
+    │   └── sets/            # List of examples
+    │   └── functions.py     # Show examples of function usage
+    │   └── task_manager.py  # Sample implementations using UniCoreFW functions
+    │   └── underscore.py    # Examples on how to use UniCoreFW as _
     └── README.md
 
 
