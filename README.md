@@ -1,5 +1,10 @@
 ![alt text](https://raw.githubusercontent.com/unicorefw-org/unicorefw-py/refs/heads/main/logo.svg)
 # UniCoreFW-py - Unicore Framework in Python
+|               |       Arrays | Objects |  Functions | Utilities | 
+| :------------ | ------------:| -------:| ----------:| ---------:|
+| **Test Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
+| **Build Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
+
 * * *
 Overview
 --------
