@@ -4,7 +4,7 @@
 | :------------ | ------------:| -------:| ----------:| ---------:|
 | **Test Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
 | **Build Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
-
+![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)
 * * *
 Overview
 --------
