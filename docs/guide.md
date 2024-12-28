@@ -815,14 +815,14 @@ Use static methods directly for one-off utility operations:
         print(result)  # Output: False
     
 
-#### 59\. `isElement(obj)`
+#### 59\. `is_element(obj)`
 
 *   **Description**: Checks if `obj` is a DOM element.
 *   **Parameters**:
     *   `obj`: The object to check.
 *   **Returns**: `True` if `obj` is an element, `False` otherwise.
 
-#### 60\. `isMatch(obj, attrs)`
+#### 60\. `is_match(obj, attrs)`
 
 *   **Description**: Checks if `obj` matches the key-value pairs in `attrs`.
 *   **Parameters**:
@@ -835,7 +835,7 @@ Use static methods directly for one-off utility operations:
         print(result)  # Output: True
     
 
-#### 61\. `isSymbol(obj)`
+#### 61\. `is_symbol(obj)`
 
 *   **Description**: Checks if `obj` is a `Symbol`.
 *   **Parameters**:
@@ -847,7 +847,7 @@ Use static methods directly for one-off utility operations:
         print(result)  # Output: False
     
 
-#### 62\. `isTypedArray(obj)`
+#### 62\. `is_typed_array(obj)`
 
 *   **Description**: Checks if `obj` is a typed array.
 *   **Parameters**:
@@ -859,7 +859,7 @@ Use static methods directly for one-off utility operations:
         print(result)  # Output: True
     
 
-#### 63\. `isWeakMap(obj)`
+#### 63\. `is_weak_map(obj)`
 
 *   **Description**: Checks if `obj` is a `WeakMap`.
 *   **Parameters**:
@@ -871,7 +871,7 @@ Use static methods directly for one-off utility operations:
         print(result)  # Output: False
     
 
-#### 64\. `isWeakSet(obj)`
+#### 64\. `is_weak_set(obj)`
 
 *   **Description**: Checks if `obj` is a `WeakSet`.
 *   **Parameters**:
