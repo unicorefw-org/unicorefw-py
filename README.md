@@ -29,7 +29,7 @@ Installation from source
 1.  Clone the repository:
     
         git clone https://github.com/unicorefw-org/unicorefw-py.git
-        cd unicore-py
+        cd unicorefw-py
     
 2.  Ensure Python 3.x is installed on your system.
 
