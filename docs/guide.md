@@ -79,7 +79,7 @@ The `UniCoreFWWrapper` class enables method chaining, allowing you to chain mult
 
 Use static methods directly for one-off utility operations:
 
-    from unicorefw import UniCoreFW
+    from unicorefw import UniCoreFW as _
       
       result = _.difference([1, 2, 3], [2, 4])
       print(result)  # Output: [1, 3]
