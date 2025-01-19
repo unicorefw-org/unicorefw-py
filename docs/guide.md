@@ -55,7 +55,7 @@ To install the UniCoreFW framework, run:
       # Static function usage
       template = "Name: <%= name %>, Age: <%= age %>"
       context = {"name": "Alice", "age": 25}
-      print(UniCoreFW.template(template, context))  # Output: "Name: Alice, Age: 25"
+      print(_.template(template, context))  # Output: "Name: Alice, Age: 25"
 
 4\. Core Features<a name="core-features"></a>
 -----------------
@@ -81,7 +81,7 @@ Use static methods directly for one-off utility operations:
 
     from unicorefw import UniCoreFW
       
-      result = UniCoreFW.difference([1, 2, 3], [2, 4])
+      result = _.difference([1, 2, 3], [2, 4])
       print(result)  # Output: [1, 3]
 
 5\. Detailed API Reference<a name="detailed-api-reference"></a>
@@ -98,7 +98,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new collection with the transformed elements.
 *   **Example**:
     
-        result = UniCoreFW.map([1, 2, 3], lambda x: x * 2)
+        result = _.map([1, 2, 3], lambda x: x * 2)
         print(result)  # Output: [2, 4, 6]
     
 
@@ -111,7 +111,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A collection with elements that passed the predicate.
 *   **Example**:
     
-        result = UniCoreFW.filter([1, 2, 3, 4], lambda x: x % 2 == 0)
+        result = _.filter([1, 2, 3, 4], lambda x: x % 2 == 0)
         print(result)  # Output: [2, 4]
     
 
@@ -125,7 +125,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The reduced single value.
 *   **Example**:
     
-        result = UniCoreFW.reduce([1, 2, 3, 4], lambda acc, x: acc + x, 0)
+        result = _.reduce([1, 2, 3, 4], lambda acc, x: acc + x, 0)
         print(result)  # Output: 10
     
 
@@ -138,7 +138,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The first element that matches the condition, or `None` if not found.
 *   **Example**:
     
-        result = UniCoreFW.find([1, 2, 3, 4], lambda x: x > 2)
+        result = _.find([1, 2, 3, 4], lambda x: x > 2)
         print(result)  # Output: 3
     
 
@@ -150,7 +150,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A collection with unique elements.
 *   **Example**:
     
-        result = UniCoreFW.uniq([1, 2, 2, 3, 4, 4, 5])
+        result = _.uniq([1, 2, 2, 3, 4, 4, 5])
         print(result)  # Output: [1, 2, 3, 4, 5]
     
 
@@ -163,7 +163,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A flattened collection.
 *   **Example**:
     
-        result = UniCoreFW.flatten([1, [2, [3, 4], 5]], depth=2)
+        result = _.flatten([1, [2, [3, 4], 5]], depth=2)
         print(result)  # Output: [1, 2, 3, 4, 5]
     
 
@@ -177,7 +177,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of keys.
 *   **Example**:
     
-        result = UniCoreFW.keys({"a": 1, "b": 2, "c": 3})
+        result = _.keys({"a": 1, "b": 2, "c": 3})
         print(result)  # Output: ['a', 'b', 'c']
     
 
@@ -189,7 +189,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of values.
 *   **Example**:
     
-        result = UniCoreFW.values({"a": 1, "b": 2, "c": 3})
+        result = _.values({"a": 1, "b": 2, "c": 3})
         print(result)  # Output: [1, 2, 3]
     
 
@@ -203,7 +203,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         target = {"a": 1}
-          result = UniCoreFW.extend(target, {"b": 2}, {"c": 3})
+          result = _.extend(target, {"b": 2}, {"c": 3})
         print(result)  # Output: {'a': 1, 'b': 2, 'c': 3}
     
 
@@ -215,7 +215,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: An object with inverted keys and values.
 *   **Example**:
     
-        result = UniCoreFW.invert({"a": 1, "b": 2, "c": 3})
+        result = _.invert({"a": 1, "b": 2, "c": 3})
         print(result)  # Output: {1: 'a', 2: 'b', 3: 'c'}
     
 
@@ -227,7 +227,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A string representing the unique ID.
 *   **Example**:
     
-        id1 = UniCoreFW.unique_id('user_')
+        id1 = _.unique_id('user_')
         print(id1)  # Output: 'user_1'
     
 
@@ -237,7 +237,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: Integer representing the current timestamp.
 *   **Example**:
     
-        timestamp = UniCoreFW.now()
+        timestamp = _.now()
         print(timestamp)  # Output: 1633029330000
     
 
@@ -250,7 +250,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list containing the results of each function call.
 *   **Example**:
     
-        result = UniCoreFW.times(3, lambda i: i * 2)
+        result = _.times(3, lambda i: i * 2)
         print(result)  # Output: [0, 2, 4]
     
 
@@ -262,7 +262,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The memoized function.
 *   **Example**:
     
-        square = UniCoreFW.memoize(lambda x: x * x)
+        square = _.memoize(lambda x: x * x)
         print(square(4))  # Output: 16
     
 
@@ -275,7 +275,7 @@ Use static methods directly for one-off utility operations:
     *   `*args`, `**kwargs`: Arguments and keyword arguments to pass to `func`.
 *   **Example**:
     
-        UniCoreFW.delay(print, 1000, 'Hello, world!')
+        _.delay(print, 1000, 'Hello, world!')
     
 
 #### 16\. `debounce(func, wait)`
@@ -287,7 +287,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The debounced function.
 *   **Example**:
     
-        debounced_func = UniCoreFW.debounce(lambda: print('Called!'), 300)
+        debounced_func = _.debounce(lambda: print('Called!'), 300)
     
 
 #### 17\. `throttle(func, wait)`
@@ -299,7 +299,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The throttled function.
 *   **Example**:
     
-        throttled_func = UniCoreFW.throttle(lambda: print('Called!'), 300)
+        throttled_func = _.throttle(lambda: print('Called!'), 300)
     
 
 ### Type Checking Functions <a name='type-checking-functions'>
@@ -312,7 +312,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a string, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_string("hello"))  # Output: True
+        print(_.is_string("hello"))  # Output: True
     
 
 #### 19\. `is_number(obj)`
@@ -323,7 +323,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a number, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_number(42))  # Output: True
+        print(_.is_number(42))  # Output: True
     
 
 #### 20\. `is_array(obj)`
@@ -334,7 +334,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a list, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_array([1, 2, 3]))  # Output: True
+        print(_.is_array([1, 2, 3]))  # Output: True
     
 
 #### 21\. `is_object(obj)`
@@ -345,7 +345,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is an object, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_object({"a": 1}))  # Output: True
+        print(_.is_object({"a": 1}))  # Output: True
     
 
 #### 22\. `is_function(obj)`
@@ -356,7 +356,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a function, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_function(lambda x: x))  # Output: True
+        print(_.is_function(lambda x: x))  # Output: True
     
 
 #### 23\. `is_boolean(obj)`
@@ -367,7 +367,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a boolean, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_boolean(True))  # Output: True
+        print(_.is_boolean(True))  # Output: True
     
 
 #### 24\. `is_date(obj)`
@@ -379,7 +379,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         from datetime import date
-        print(UniCoreFW.is_date(date.today()))  # Output: True
+        print(_.is_date(date.today()))  # Output: True
     
 
 #### 25\. `is_null(obj)`
@@ -390,7 +390,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is `None`, otherwise `False`.
 *   **Example**:
     
-        print(UniCoreFW.is_null(None))  # Output: True
+        print(_.is_null(None))  # Output: True
     
 
 ### Utility Functions <a name='utility-functions'>
@@ -400,7 +400,7 @@ Use static methods directly for one-off utility operations:
 *   **Description**: A function that does nothing and returns `None`. Useful as a placeholder.
 *   **Example**:
     
-        result = UniCoreFW.noop()
+        result = _.noop()
         print(result)  # Output: None
     
 
@@ -412,7 +412,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function.
 *   **Example**:
     
-        const_func = UniCoreFW.constant(42)
+        const_func = _.constant(42)
         print(const_func())  # Output: 42
     
 
@@ -425,7 +425,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A wrapped function.
 *   **Example**:
     
-        wrapped = UniCoreFW.wrap(lambda x: x * 2, lambda func, x: func(x) + 1)
+        wrapped = _.wrap(lambda x: x * 2, lambda func, x: func(x) + 1)
         print(wrapped(5))  # Output: 11
     
 
@@ -438,7 +438,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The original `collection`.
 *   **Example**:
     
-        result = UniCoreFW.tap([1, 2, 3], lambda x: print("Array: ", x))
+        result = _.tap([1, 2, 3], lambda x: print("Array: ", x))
           # Output: Array: [1, 2, 3]
         print(result)  # Output: [1, 2, 3]
     
@@ -452,7 +452,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         obj = {"a": 1, "b": 2}
-          cloned = UniCoreFW.clone(obj)
+          cloned = _.clone(obj)
         print(cloned)  # Output: {'a': 1, 'b': 2}
     
 
@@ -466,7 +466,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array without falsey values.
 *   **Example**:
     
-        result = UniCoreFW.compact([0, 1, False, 2, '', 3])
+        result = _.compact([0, 1, False, 2, '', 3])
         print(result)  # Output: [1, 2, 3]
     
 
@@ -479,7 +479,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array with unique elements from `array` not present in `others`.
 *   **Example**:
     
-        result = UniCoreFW.difference([1, 2, 3, 4], [2, 4])
+        result = _.difference([1, 2, 3, 4], [2, 4])
         print(result)  # Output: [1, 3]
     
 
@@ -492,7 +492,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A dictionary with keys generated by `key_func` and lists of elements as values.
 *   **Example**:
     
-        result = UniCoreFW.group_by([1.2, 1.4, 2.1, 2.4], lambda x: int(x))
+        result = _.group_by([1.2, 1.4, 2.1, 2.4], lambda x: int(x))
         print(result)  # Output: {1: [1.2, 1.4], 2: [2.1, 2.4]}
     
 
@@ -505,7 +505,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A tuple of two lists.
 *   **Example**:
     
-        result = UniCoreFW.partition([1, 2, 3, 4], lambda x: x % 2 == 0)
+        result = _.partition([1, 2, 3, 4], lambda x: x % 2 == 0)
         print(result)  # Output: ([2, 4], [1, 3])
     
 
@@ -517,7 +517,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of tuples.
 *   **Example**:
     
-        result = UniCoreFW.zip([1, 2, 3], ['a', 'b', 'c'])
+        result = _.zip([1, 2, 3], ['a', 'b', 'c'])
         print(result)  # Output: [(1, 'a'), (2, 'b'), (3, 'c')]
     
 
@@ -529,7 +529,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of lists.
 *   **Example**:
     
-        result = UniCoreFW.unzip([(1, 'a'), (2, 'b'), (3, 'c')])
+        result = _.unzip([(1, 'a'), (2, 'b'), (3, 'c')])
         print(result)  # Output: [[1, 2, 3], ['a', 'b', 'c']]
     
 
@@ -541,7 +541,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of `[key, value]` pairs.
 *   **Example**:
     
-        result = UniCoreFW.pairs({"a": 1, "b": 2})
+        result = _.pairs({"a": 1, "b": 2})
         print(result)  # Output: [['a', 1], ['b', 2]]
     
 
@@ -554,7 +554,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array without the specified values.
 *   **Example**:
     
-        result = UniCoreFW.without([1, 2, 3, 1, 4], 1, 4)
+        result = _.without([1, 2, 3, 1, 4], 1, 4)
         print(result)  # Output: [2, 3]
     
 
@@ -568,7 +568,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of results.
 *   **Example**:
     
-        result = UniCoreFW.invoke([[3, 2, 1], [5, 4]], 'sort')
+        result = _.invoke([[3, 2, 1], [5, 4]], 'sort')
         print(result)  # Output: [[1, 2, 3], [4, 5]]
     
 
@@ -582,7 +582,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         data = [{"name": "Alice", "age": 25}, {"name": "Bob", "age": 30}]
-          result = UniCoreFW.pluck(data, 'age')
+          result = _.pluck(data, 'age')
         print(result)  # Output: [25, 30]
     
 
@@ -594,7 +594,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array with the elements shuffled.
 *   **Example**:
     
-        result = UniCoreFW.shuffle([1, 2, 3, 4, 5])
+        result = _.shuffle([1, 2, 3, 4, 5])
         print(result)  # Output: [3, 1, 5, 2, 4] (order may vary)
     
 
@@ -607,7 +607,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of sampled elements.
 *   **Example**:
     
-        result = UniCoreFW.sample([1, 2, 3, 4, 5], 2)
+        result = _.sample([1, 2, 3, 4, 5], 2)
         print(result)  # Output: [2, 5] (sample may vary)
     
 
@@ -620,7 +620,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new sorted array.
 *   **Example**:
     
-        result = UniCoreFW.sort_by([{'age': 30}, {'age': 20}, {'age': 25}], lambda x: x['age'])
+        result = _.sort_by([{'age': 30}, {'age': 20}, {'age': 25}], lambda x: x['age'])
         print(result)  # Output: [{'age': 20}, {'age': 25}, {'age': 30}]
     
 
@@ -633,7 +633,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A dictionary with keys generated by `key_func` and counts as values.
 *   **Example**:
     
-        result = UniCoreFW.count_by(['apple', 'banana', 'apple', 'cherry'], lambda x: len(x))
+        result = _.count_by(['apple', 'banana', 'apple', 'cherry'], lambda x: len(x))
         print(result)  # Output: {5: 3, 6: 1}
     
 
@@ -646,7 +646,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The maximum value.
 *   **Example**:
     
-        result = UniCoreFW.max([1, 2, 3, 4], key_func=lambda x: -x)
+        result = _.max([1, 2, 3, 4], key_func=lambda x: -x)
         print(result)  # Output: 1
     
 
@@ -659,7 +659,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The minimum value.
 *   **Example**:
     
-        result = UniCoreFW.min([1, 2, 3, 4], key_func=lambda x: -x)
+        result = _.min([1, 2, 3, 4], key_func=lambda x: -x)
         print(result)  # Output: 4
     
 
@@ -672,7 +672,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if all elements pass the test, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.every([2, 4, 6], lambda x: x % 2 == 0)
+        result = _.every([2, 4, 6], lambda x: x % 2 == 0)
         print(result)  # Output: True
     
 
@@ -685,7 +685,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if any elements pass the test, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.some([1, 2, 3], lambda x: x > 2)
+        result = _.some([1, 2, 3], lambda x: x > 2)
         print(result)  # Output: True
     
 
@@ -698,7 +698,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if the objects are equivalent, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_equal({'a': 1, 'b': {'c': 2}}, {'a': 1, 'b': {'c': 2}})
+        result = _.is_equal({'a': 1, 'b': {'c': 2}}, {'a': 1, 'b': {'c': 2}})
         print(result)  # Output: True
     
 
@@ -710,7 +710,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function that checks for matching attributes.
 *   **Example**:
     
-        matcher = UniCoreFW.matches({'a': 1, 'b': 2})
+        matcher = _.matches({'a': 1, 'b': 2})
           result = matcher({'a': 1, 'b': 2, 'c': 3})
         print(result)  # Output: True
     
@@ -723,7 +723,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function.
 *   **Example**:
     
-        iteratee_func = UniCoreFW.iteratee('age')
+        iteratee_func = _.iteratee('age')
           result = iteratee_func({'name': 'John', 'age': 30})
         print(result)  # Output: 30
     
@@ -737,7 +737,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `key` is present, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.has({'a': 1, 'b': 2}, 'b')
+        result = _.has({'a': 1, 'b': 2}, 'b')
         print(result)  # Output: True
     
 
@@ -749,7 +749,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new dictionary with inverted keys and values.
 *   **Example**:
     
-        result = UniCoreFW.invert({'a': 1, 'b': 2})
+        result = _.invert({'a': 1, 'b': 2})
         print(result)  # Output: {1: 'a', 2: 'b'}
     
 
@@ -762,7 +762,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The index of the found element, or `-1` if not found.
 *   **Example**:
     
-        result = UniCoreFW.find_index([1, 2, 3, 4], lambda x: x == 3)
+        result = _.find_index([1, 2, 3, 4], lambda x: x == 3)
         print(result)  # Output: 2
     
 
@@ -775,7 +775,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The index of the found element, or `-1` if not found.
 *   **Example**:
     
-        result = UniCoreFW.find_last_index([1, 2, 3, 4, 3], lambda x: x == 3)
+        result = _.find_last_index([1, 2, 3, 4, 3], lambda x: x == 3)
         print(result)  # Output: 4
     
 
@@ -787,7 +787,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is an `arguments` object, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_arguments(['arg1', 'arg2'])
+        result = _.is_arguments(['arg1', 'arg2'])
         print(result)  # Output: False
     
 
@@ -799,7 +799,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is an `ArrayBuffer`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_array_buffer(memoryview(b'example'))
+        result = _.is_array_buffer(memoryview(b'example'))
         print(result)  # Output: True
     
 
@@ -811,7 +811,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a `DataView`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_data_view(memoryview(b'example'))
+        result = _.is_data_view(memoryview(b'example'))
         print(result)  # Output: False
     
 
@@ -831,7 +831,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` matches `attrs`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_match({'a': 1, 'b': 2}, {'b': 2})
+        result = _.is_match({'a': 1, 'b': 2}, {'b': 2})
         print(result)  # Output: True
     
 
@@ -843,7 +843,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a `Symbol`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_symbol('example')
+        result = _.is_symbol('example')
         print(result)  # Output: False
     
 
@@ -855,7 +855,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a typed array, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_typed_array(bytearray([1, 2, 3]))
+        result = _.is_typed_array(bytearray([1, 2, 3]))
         print(result)  # Output: True
     
 
@@ -867,7 +867,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a `WeakMap`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_weak_map({})
+        result = _.is_weak_map({})
         print(result)  # Output: False
     
 
@@ -879,7 +879,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if `obj` is a `WeakSet`, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.is_weak_set(set([1, 2, 3]))
+        result = _.is_weak_set(set([1, 2, 3]))
         print(result)  # Output: False
     
 
@@ -890,8 +890,8 @@ Use static methods directly for one-off utility operations:
     *   `obj` (dict): A dictionary of functions to add.
 *   **Example**:
     
-        UniCoreFW.mixin({'triple': lambda x: x * 3})
-        print(UniCoreFW.triple(4))  # Output: 12
+        _.mixin({'triple': lambda x: x * 3})
+        print(_.triple(4))  # Output: 12
     
 
 #### 66\. `random(min, max)`
@@ -903,7 +903,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A random integer.
 *   **Example**:
     
-        result = UniCoreFW.random(1, 10)
+        result = _.random(1, 10)
         print(result)  # Output: 7 (value may vary)
     
 
@@ -915,7 +915,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The number of elements in the collection.
 *   **Example**:
     
-        result = UniCoreFW.size([1, 2, 3])
+        result = _.size([1, 2, 3])
         print(result)  # Output: 3
     
 
@@ -928,7 +928,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new sorted array.
 *   **Example**:
     
-        result = UniCoreFW.sort_by([{'age': 30}, {'age': 20}, {'age': 25}], lambda x: x['age'])
+        result = _.sort_by([{'age': 30}, {'age': 20}, {'age': 25}], lambda x: x['age'])
         print(result)  # Output: [{'age': 20}, {'age': 25}, {'age': 30}]
     
 
@@ -940,7 +940,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: An array representation of the collection.
 *   **Example**:
     
-        result = UniCoreFW.to_array({1, 2, 3})
+        result = _.to_array({1, 2, 3})
         print(result)  # Output: [1, 2, 3]
     
 
@@ -953,7 +953,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A wrapped function.
 *   **Example**:
     
-        wrapped = UniCoreFW.wrap(lambda x: x * 2, lambda func, x: func(x) + 1)
+        wrapped = _.wrap(lambda x: x * 2, lambda func, x: func(x) + 1)
         print(wrapped(5))  # Output: 11
     
 
@@ -967,7 +967,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of results.
 *   **Example**:
     
-        result = UniCoreFW.invoke_map([[5, 1, 7], [3, 2]], 'sort')
+        result = _.invoke_map([[5, 1, 7], [3, 2]], 'sort')
         print(result)  # Output: [[1, 5, 7], [2, 3]]
     
 
@@ -979,7 +979,7 @@ Use static methods directly for one-off utility operations:
     *   `*args`: Arguments to pass to the function.
 *   **Example**:
     
-        UniCoreFW.defer(print, "This will be printed after the current call stack is clear")
+        _.defer(print, "This will be printed after the current call stack is clear")
     
 
 #### 73\. `delay(func, wait, *args)`
@@ -991,7 +991,7 @@ Use static methods directly for one-off utility operations:
     *   `*args`: Arguments to pass to the function.
 *   **Example**:
     
-        UniCoreFW.delay(print, 1000, "Printed after 1 second")
+        _.delay(print, 1000, "Printed after 1 second")
     
 
 #### 74\. `before(n, func)`
@@ -1003,7 +1003,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new restricted function.
 *   **Example**:
     
-        limitedFunc = UniCoreFW.before(3, lambda: print("Called"))
+        limitedFunc = _.before(3, lambda: print("Called"))
           limitedFunc()  # Output: "Called"
           limitedFunc()  # Output: "Called"
           limitedFunc()  # No output
@@ -1018,7 +1018,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new function.
 *   **Example**:
     
-        callAfter = UniCoreFW.after(3, lambda: print("Executed"))
+        callAfter = _.after(3, lambda: print("Executed"))
           callAfter()  # No output
           callAfter()  # No output
           callAfter()  # Output: "Executed"
@@ -1033,7 +1033,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         isOdd = lambda x: x % 2 != 0
-          isEven = UniCoreFW.negate(isOdd)
+          isEven = _.negate(isOdd)
         print(isEven(4))  # Output: True
     
 
@@ -1045,7 +1045,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function.
 *   **Example**:
     
-        always42 = UniCoreFW.constant(42)
+        always42 = _.constant(42)
         print(always42())  # Output: 42
     
 
@@ -1058,7 +1058,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of results.
 *   **Example**:
     
-        result = UniCoreFW.times(3, lambda: "Hello")
+        result = _.times(3, lambda: "Hello")
         print(result)  # Output: ["Hello", "Hello", "Hello"]
     
 
@@ -1070,7 +1070,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The same `value`.
 *   **Example**:
     
-        result = UniCoreFW.identity(5)
+        result = _.identity(5)
         print(result)  # Output: 5
     
 
@@ -1082,7 +1082,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A unique ID as a string.
 *   **Example**:
     
-        id1 = UniCoreFW.unique_id("user_")
+        id1 = _.unique_id("user_")
         print(id1)  # Output: "user_1"
     
 
@@ -1094,7 +1094,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The escaped string.
 *   **Example**:
     
-        result = UniCoreFW.escape("
+        result = _.escape("
     
     Sample
     
@@ -1110,7 +1110,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The unescaped string.
 *   **Example**:
     
-        result = UniCoreFW.unescape("<div>Sample</div>")
+        result = _.unescape("<div>Sample</div>")
         print(result)  # Output: "
     
     Sample
@@ -1129,7 +1129,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         obj = {"name": "Alice", "greet": lambda greeting: f"{greeting}, Alice!"}
-          result = UniCoreFW.result(obj, "greet", "Hello")
+          result = _.result(obj, "greet", "Hello")
         print(result)  # Output: "Hello, Alice!"
     
 
@@ -1138,7 +1138,7 @@ Use static methods directly for one-off utility operations:
 *   **Description**: A function that does nothing and returns `None`. Useful as a placeholder.
 *   **Example**:
     
-        result = UniCoreFW.noop()
+        result = _.noop()
         print(result)  # Output: None
     
 
@@ -1151,7 +1151,7 @@ Use static methods directly for one-off utility operations:
 *   **Example**:
     
         original = {"a": 1, "b": {"c": 2}}
-          copied = UniCoreFW.deep_copy(original)
+          copied = _.deep_copy(original)
         print(copied)  # Output: {'a': 1, 'b': {'c': 2}}
     
 
@@ -1164,7 +1164,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new object with modified values.
 *   **Example**:
     
-        result = UniCoreFW.map_object({"a": 1, "b": 2}, lambda x: x * 2)
+        result = _.map_object({"a": 1, "b": 2}, lambda x: x * 2)
         print(result)  # Output: {"a": 2, "b": 4}
     
 
@@ -1176,7 +1176,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of `[key, value]` pairs.
 *   **Example**:
     
-        result = UniCoreFW.pairs({"a": 1, "b": 2})
+        result = _.pairs({"a": 1, "b": 2})
         print(result)  # Output: [["a", 1], ["b", 2]]
     
 
@@ -1188,7 +1188,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new object.
 *   **Example**:
     
-        result = UniCoreFW.object([["a", 1], ["b", 2]])
+        result = _.object([["a", 1], ["b", 2]])
         print(result)  # Output: {"a": 1, "b": 2}
     
 
@@ -1201,7 +1201,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of elements.
 *   **Example**:
     
-        result = UniCoreFW.reject([1, 2, 3, 4], lambda x: x % 2 == 0)
+        result = _.reject([1, 2, 3, 4], lambda x: x % 2 == 0)
         print(result)  # Output: [1, 3]
     
 
@@ -1214,7 +1214,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A tuple containing two lists.
 *   **Example**:
     
-        result = UniCoreFW.partition([1, 2, 3, 4], lambda x: x % 2 == 0)
+        result = _.partition([1, 2, 3, 4], lambda x: x % 2 == 0)
         print(result)  # Output: ([2, 4], [1, 3])
     
 
@@ -1227,7 +1227,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The original `obj`.
 *   **Example**:
     
-        result = UniCoreFW.tap([1, 2, 3], lambda x: print("Tapped array:", x))
+        result = _.tap([1, 2, 3], lambda x: print("Tapped array:", x))
         print(result)  # Output: [1, 2, 3]
     
 
@@ -1240,7 +1240,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A sorted list.
 *   **Example**:
     
-        result = UniCoreFW.sort_by_all([{ "name": "John", "age": 25 }, { "name": "Jane", "age": 20 }], lambda x: x["age"], lambda x: x["name"])
+        result = _.sort_by_all([{ "name": "John", "age": 25 }, { "name": "Jane", "age": 20 }], lambda x: x["age"], lambda x: x["name"])
         print(result)  # Output: [{'name': 'Jane', 'age': 20}, {'name': 'John', 'age': 25}]
     
 
@@ -1252,7 +1252,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A single array of grouped elements.
 *   **Example**:
     
-        result = UniCoreFW.zip(["a", "b"], [1, 2], [True, False])
+        result = _.zip(["a", "b"], [1, 2], [True, False])
         print(result)  # Output: [["a", 1, True], ["b", 2, False]]
     
 
@@ -1264,7 +1264,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of arrays.
 *   **Example**:
     
-        result = UniCoreFW.unzip([["a", 1, True], ["b", 2, False]])
+        result = _.unzip([["a", 1, True], ["b", 2, False]])
         print(result)  # Output: [["a", "b"], [1, 2], [True, False]]
     
 
@@ -1277,7 +1277,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new filtered array.
 *   **Example**:
     
-        result = UniCoreFW.without([1, 2, 3, 4], 2, 4)
+        result = _.without([1, 2, 3, 4], 2, 4)
         print(result)  # Output: [1, 3]
     
 
@@ -1290,7 +1290,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if any element passes the check, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.some([1, 2, 3], lambda x: x > 2)
+        result = _.some([1, 2, 3], lambda x: x > 2)
         print(result)  # Output: True
     
 
@@ -1303,7 +1303,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: `True` if all elements pass the check, `False` otherwise.
 *   **Example**:
     
-        result = UniCoreFW.every([1, 2, 3], lambda x: x > 0)
+        result = _.every([1, 2, 3], lambda x: x > 0)
         print(result)  # Output: True
     
 
@@ -1315,7 +1315,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The minimum value.
 *   **Example**:
     
-        result = UniCoreFW.min([3, 1, 4, 2])
+        result = _.min([3, 1, 4, 2])
         print(result)  # Output: 1
     
 
@@ -1327,7 +1327,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The maximum value.
 *   **Example**:
     
-        result = UniCoreFW.max([3, 1, 4, 2])
+        result = _.max([3, 1, 4, 2])
         print(result)  # Output: 4
     
 
@@ -1341,7 +1341,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of results from invoking the method.
 *   **Example**:
     
-        result = UniCoreFW.invoke([[5, 1, 7], [3, 2]], 'sort')
+        result = _.invoke([[5, 1, 7], [3, 2]], 'sort')
         print(result)  # Output: [[1, 5, 7], [2, 3]]
     
 
@@ -1353,7 +1353,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function that returns `True` or `False`.
 *   **Example**:
     
-        matcher = UniCoreFW.matches({"name": "John"})
+        matcher = _.matches({"name": "John"})
         print(matcher({"name": "John", "age": 30}))  # Output: True
     
 
@@ -1365,7 +1365,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function.
 *   **Example**:
     
-        getName = UniCoreFW.property("name")
+        getName = _.property("name")
         print(getName({"name": "Alice"}))  # Output: "Alice"
     
 
@@ -1377,7 +1377,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A function.
 *   **Example**:
     
-        getValue = UniCoreFW.property_of({"a": 1, "b": 2})
+        getValue = _.property_of({"a": 1, "b": 2})
         print(getValue("b"))  # Output: 2
     
 
@@ -1390,7 +1390,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of values.
 *   **Example**:
     
-        result = UniCoreFW.pluck([{ "name": "Alice" }, { "name": "Bob" }], "name")
+        result = _.pluck([{ "name": "Alice" }, { "name": "Bob" }], "name")
         print(result)  # Output: ["Alice", "Bob"]
     
 
@@ -1404,7 +1404,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: The reduced value.
 *   **Example**:
     
-        result = UniCoreFW.reduce_right([1, 2, 3, 4], lambda acc, x: acc - x, 0)
+        result = _.reduce_right([1, 2, 3, 4], lambda acc, x: acc - x, 0)
         print(result)  # Output: -2
     
 
@@ -1416,7 +1416,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new shuffled array.
 *   **Example**:
     
-        result = UniCoreFW.shuffle([1, 2, 3, 4, 5])
+        result = _.shuffle([1, 2, 3, 4, 5])
         print(result)  # Output: [3, 5, 1, 4, 2] (order may vary)
     
 
@@ -1429,7 +1429,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new sorted array.
 *   **Example**:
     
-        result = UniCoreFW.sort_by([{ "name": "Alice", "age": 30 }, { "name": "Bob", "age": 25 }], lambda x: x["age"])
+        result = _.sort_by([{ "name": "Alice", "age": 30 }, { "name": "Bob", "age": 25 }], lambda x: x["age"])
         print(result)  # Output: [{"name": "Bob", "age": 25}, {"name": "Alice", "age": 30}]
     
 
@@ -1442,7 +1442,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of matched elements.
 *   **Example**:
     
-        result = UniCoreFW.where_([{ "name": "Alice", "age": 30 }, { "name": "Bob", "age": 25 }], { "age": 30 })
+        result = _.where_([{ "name": "Alice", "age": 30 }, { "name": "Bob", "age": 25 }], { "age": 30 })
         print(result)  # Output: [{"name": "Alice", "age": 30}]
     
 
@@ -1455,7 +1455,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new object.
 *   **Example**:
     
-        result = UniCoreFW.zip(["a", "b", "c"], [1, 2, 3])
+        result = _.zip(["a", "b", "c"], [1, 2, 3])
         print(result)  # Output: {"a": 1, "b": 2, "c": 3}
     
 
@@ -1469,7 +1469,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A list of numbers.
 *   **Example**:
     
-        result = UniCoreFW.range(0, 5)
+        result = _.range(0, 5)
         print(result)  # Output: [0, 1, 2, 3, 4]
     
 
@@ -1481,7 +1481,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A combined array of unique values.
 *   **Example**:
     
-        result = UniCoreFW.union([1, 2], [2, 3], [3, 4])
+        result = _.union([1, 2], [2, 3], [3, 4])
         print(result)  # Output: [1, 2, 3, 4]
     
 
@@ -1493,7 +1493,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array containing elements common to all arrays.  
     **Example**:
     
-        result = UniCoreFW.intersection([1, 2, 3], [2, 3, 4], [3, 4, 5]) 
+        result = _.intersection([1, 2, 3], [2, 3, 4], [3, 4, 5]) 
         print(result) # Output: [3]
     
 
@@ -1506,24 +1506,11 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array with filtered values.
 *   **Example**:
     
-        result = UniCoreFW.difference([1, 2, 3, 4], [2, 4], [3])
+        result = _.difference([1, 2, 3, 4], [2, 4], [3])
         print(result) # Output: [1]
     
 
-### 114\. `flatten_depth(array, depth=1)`
-
-*   **Description**: Flattens `array` up to the specified `depth`.
-*   **Parameters**:
-    *   `array` (list): The array to flatten.
-    *   `depth` (int, optional): The depth level specifying how deep to flatten the array. Default is 1.
-*   **Returns**: A new flattened array.
-*   **Example**:
-    
-        result = UniCoreFW.flatten_depth([1, [2, [3, [4, 5]]]], 2)
-        print(result) # Output: [1, 2, 3, [4, 5]]
-    
-
-### 115\. `xor(*arrays)`
+### 114\. `xor(*arrays)`
 
 *   **Description**: Creates an array of unique values that is the symmetric difference of the provided arrays.
 *   **Parameters**:
@@ -1531,7 +1518,7 @@ Use static methods directly for one-off utility operations:
 *   **Returns**: A new array with unique values.
 *   **Example**:  
     
-        result = UniCoreFW.xor([2, 1], [2, 3])
+        result = _.xor([2, 1], [2, 3])
         print(result) # Output: [1, 3]
     
 
@@ -1550,7 +1537,7 @@ Use static methods directly for one-off utility operations:
 
     from unicorefw import _
       
-      result = UniCoreFW.difference([1, 2, 3], [2, 3])
+      result = _.difference([1, 2, 3], [2, 3])
       print(result)  # Output: [1]
 
 7\. Contributing<a name="contributing"></a>
