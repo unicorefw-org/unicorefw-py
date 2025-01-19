@@ -153,7 +153,7 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.is_finite` – Checks if a value is a finite number.
 - `_.is_boolean` – Checks if a value is a boolean.
 - `_.is_date` – Checks if a value is a date.
-- `_.is_regExp` – Checks if a value is a regular expression.
+- `_.is_reg_exp` – Checks if a value is a regular expression.
 - `_.is_error` – Checks if a value is an error.
 - `_.is_symbol` – Checks if a value is a symbol.
 - `_.is_map` – Checks if a value is a map.
