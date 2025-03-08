@@ -1,86 +1,118 @@
-![alt text](https://raw.githubusercontent.com/unicorefw-org/unicorefw-py/refs/heads/main/logo.svg)
-# UniCoreFW-py - Unicore Framework in Python
-|               |       Arrays | Objects |  Functions | Utilities | 
-| :------------ | ------------:| -------:| ----------:| ---------:|
-| **Test Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
-| **Build Status**         |            ✓ |       ✓ |         ✓ |         ✓ |
-![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)
-* * *
+<p align="center"><img src="https://unicorefw.org/logo.png?v=1.0.2" /></p>
+|                                                                                                           | Arrays | Objects | Functions | Utilities |
+| :---------------------------------------------------------------------------------------------------------- | -------: | --------: | ----------: | ----------: |
+| **Test Status**                                                                                           |     ✓ |      ✓ |        ✓ |        ✓ |
+| **Build Status**                                                                                          |      ✓ |      ✓ |        ✓ |        ✓ |
+| ![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg) |        |         |           |           |
+
+---
+
 Overview
 --------
-UniCoreFW-PY, a part of UnicoreFW.org is a Python-based framework based on UnderscoreJS, designed to offer a comprehensive set of utilities and functional programming tools. This framework is equipped with command-line capabilities that allow users to execute example scripts, parse custom command-line arguments, and integrate powerful utility methods for various use cases. The goal of UnicoreFW is to provide security, performance, and ease of use for developers looking to build and maintain Python applications.
 
+UniCoreFW-PY, a part of UniCoreFW.org is a Python-based framework based on UnderscoreJS, designed to offer a comprehensive set of utilities and functional programming tools. This framework is equipped with command-line capabilities that allow users to execute example scripts, parse custom command-line arguments, and integrate powerful utility methods for various use cases. The goal of UnicoreFW is to provide security, performance, and ease of use for developers looking to build and maintain Python applications.
 
 Features
 --------
-    
-*   **Flexible Test Execution**: Run example scripts through the command line for rapid prototyping and testing.
-*   **Utility Functions**: Includes a robust set of utility methods for functional programming, string manipulation, and more.
-*   **Secure Execution**: Built-in security measures to safely execute code and handle user inputs.
 
+* **Flexible Test Execution**: Run example scripts through the command line for rapid prototyping and testing.
+* **Utility Functions**: Includes a robust set of utility methods for functional programming, string manipulation, and more.
+* **Secure Execution**: Built-in security measures to safely execute code and handle user inputs.
+
+Changelogs
+----------
+
+## Version 1.0.2
+
+* **Function/Context:** `@@ -11,10 +11,145 @@`
+* **Removed:** `import random`
+* **Added:** `import secrets`
+* **Added:** `from functools import lru_cache`
+* **Added:** `lock = threading.Lock()`
+* **Added:** `counter = 0`
+
+#### New Features:
+
+* Implemented a robust security foundation with new exception classes:
+  * `SecurityError`: Base exception for security-related errors.
+  * `InputValidationError`: Raised when input validation fails.
+  * `AuthorizationError`: Raised when authorization checks fail.
+  * `SanitizationError`: Raised when data sanitization fails.
+
+#### New Class:
+
+* **RateLimiter** :
+  * Implements rate limiting to prevent DoS attacks.
+  * Supports`max_calls` and`time_window` configuration.
 
 Installation from Pypi using PIP
-------------
-    pip install unicorefw
+--------------------------------
+
+pip install unicorefw
+
+
 
 Installation from source
-------------
+------------------------
 
-1.  Clone the repository:
-    
-        git clone https://github.com/unicorefw-org/unicorefw-py.git
-        cd unicorefw-py
-    
-2.  Ensure Python 3.x is installed on your system.
+1. Clone the repository:
+   
+   git clone https://github.com/unicorefw-org/unicorefw-py.git
+   cd unicorefw-py
+   
+2. Ensure Python 3.x is installed on your system.
 
-
-
-Directory Structure
--------------------
-
-    project_root_dir/
-    ├── src/
-    │   └── unicorefw.py
-    ├── examples/
-    │   └── sets/            # List of examples
-    │   └── functions.py     # Show examples of function usage
-    │   └── task_manager.py  # Sample implementations using UniCoreFW functions
-    │   └── underscore.py    # Examples on how to use UniCoreFW as _
-    └── README.md
-
+3. Directory Structure
+```
+project_root_dir/
+├── src/
+│   └── unicorefw.py
+├── examples/
+│   └── sets/            # List of examples
+│   └── functions.py     # Show examples of function usage
+│   └── task_manager.py  # Sample implementations using UniCoreFW functions
+│   └── underscore.py    # Examples on how to use UniCoreFW as _
+└── README.md
+```
 
 Quick Start Guide
 -----------------
+```
+from unicorefw import UniCoreFW, UniCoreFWWrapper
 
-    from unicorefw import UniCoreFW, UniCoreFWWrapper
+def _(collection):
+return UniCoreFWWrapper(collection)
 
-    def _(collection):
-        return UniCoreFWWrapper(collection)
+# Attach functions from 'Unicore' directly to '_'
 
-    # Attach functions from 'Unicore' directly to '_'
-    for func_name in dir(UniCoreFW):
-        if callable(getattr(UniCoreFW, func_name)) and not func_name.startswith("_"):
-            setattr(_, func_name, getattr(UniCoreFW, func_name))
+for func_name in dir(UniCoreFW):
+if callable(getattr(UniCoreFW, func_name)) and not func_name.startswith("_"):
+setattr(_, func_name, getattr(UniCoreFW, func_name))
 
-    # Example usage:
-    result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value()
-    print(result)  # Expected output: [6, 8, 10]
+# Example usage:
+result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value()
+print(result)  # Expected output: [6, 8, 10]
 
-    # Using a static function call
-    template = "Name: <%= name %>, Age: <%= age %>"
-    context = {"name": "Alice", "age": 25}
-    result = _.template(template, context)
-    print(result)  # Expected output: "Name: Alice, Age: 25"
+# Using a static function call
+template = "Name: <%= name %>, Age: <%= age %>"
+context = {"name": "Alice", "age": 25}
+result = _.template(template, context)
+print(result)  # Expected output: "Name: Alice, Age: 25"
+```
 
 Documention
-------------
- Please see `docs/guide.md` for more information.
+-----------
+
+Please see `docs/guide.md` for more information.
 
 **PYTHON IMPLEMENTATION**
-* * *
+
+---
+
 This class, `UniCoreFW`, provides a wide range of utility functions for working with arrays, objects, and strings. Here's a summary of what each method does:
 
 **Array Functions**
+
 - `_.map` – Transforms an array's elements based on a function.
 - `_.reduce` – Reduces an array to a single value using a function.
 - `_.reduce_right` – Like - `_.reduce, but starts from the right.
@@ -123,6 +155,7 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.chunk` – Splits an array into chunks of a specified size.
 
 **Object Functions**
+
 - `_.keys` – Returns an array of an object's keys.
 - `_.all_keys` – Returns an array of an object's keys, including inherited ones.
 - `_.values` – Returns an array of an object's values.
@@ -168,6 +201,7 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.is_data_view` – Checks if a value is a data view.
 
 **Utility Functions**
+
 - `_.identity` – Returns the same value that is passed.
 - `_.constant` – Returns a function that returns the given value.
 - `_.noop` – A function that does nothing.
@@ -185,6 +219,7 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.value` – Extracts the result from a chained object.
 
 **Function Functions**
+
 - `_.bind` – Binds a function to an object.
 - `_.partial` – Partially applies a function by pre-filling some arguments.
 - `_.bind_all` – Binds methods of an object to the object itself.
@@ -201,24 +236,22 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.compose` – Composes functions together to run in sequence.
 
 **Chaining Functions**
+
 - `_.chain` – Starts a chain.
 - `_.value` – Extracts the value at the end of a chain.
-
 
 Security Considerations
 -----------------------
 
-*   **Safe Execution**: The framework ensures that code execution is sandboxed and limited in scope to avoid unwanted side effects.
-*   **Input Validation**: Command-line inputs are validated to prevent invalid or malicious commands.
-    
+* **Safe Execution**: The framework ensures that code execution is sandboxed and limited in scope to avoid unwanted side effects.
+* **Input Validation**: Command-line inputs are validated to prevent invalid or malicious commands.
 
 Contributing
 ------------
 
 We welcome contributions to UnicoreFW! Please follow these steps:
 
-1.  Follow principles in CODE_OF_CONDUCT.md
-2.  Fork the repository.
-3.  Create a feature branch.
-4.  Submit a pull request with a detailed description of your changes.
-    
+1. Follow principles in CODE_OF_CONDUCT.md
+2. Fork the repository.
+3. Create a feature branch.
+4. Submit a pull request with a detailed description of your changes.
