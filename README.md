@@ -1,4 +1,6 @@
 <p align="center"><img src="https://unicorefw.org/logo.png?v=1.0.2" /></p>
+
+
 |                                                                                                           | Arrays | Objects | Functions | Utilities |
 | :---------------------------------------------------------------------------------------------------------- | -------: | --------: | ----------: | ----------: |
 | **Test Status**                                                                                           |     ✓ |      ✓ |        ✓ |        ✓ |
@@ -24,7 +26,6 @@ Changelogs
 
 ## Version 1.0.2
 
-* **Function/Context:** `@@ -11,10 +11,145 @@`
 * **Removed:** `import random`
 * **Added:** `import secrets`
 * **Added:** `from functools import lru_cache`
@@ -47,9 +48,7 @@ Changelogs
 
 Installation from Pypi using PIP
 --------------------------------
-
 pip install unicorefw
-
 
 
 Installation from source
