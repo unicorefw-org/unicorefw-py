@@ -23,7 +23,7 @@ Features
 Changelogs
 ----------
 
-## Version 1.0.2
+## Version 1.0.2 
 
 * **Removed:** `import random`
 * **Added:** `import secrets`
