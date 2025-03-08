@@ -11,10 +11,145 @@
 ########################################################################
 
 import re
-import random
+import secrets
 import threading
 import time
 import types
+from functools import lru_cache
+
+lock = threading.Lock()
+counter = 0
+
+# First, let's create a robust security foundation
+class SecurityError(Exception):
+    """Base exception for security-related errors"""
+    pass
+
+class InputValidationError(SecurityError):
+    """Raised when input validation fails"""
+    pass
+
+class AuthorizationError(SecurityError):
+    """Raised when authorization checks fail"""
+    pass
+
+class SanitizationError(SecurityError):
+    """Raised when data sanitization fails"""
+    pass
+class RateLimiter:
+    """
+    Rate limiting implementation to prevent DoS attacks
+    """
+    def __init__(self, max_calls=100, time_window=60):
+        self.max_calls = max_calls
+        self.time_window = time_window
+        self.calls = []
+        self._lock = threading.Lock()
+    
+    def __enter__(self):
+        with self._lock:
+            now = time.time()
+            # Remove old calls
+            self.calls = [t for t in self.calls if now - t < self.time_window]
+            
+            if len(self.calls) >= self.max_calls:
+                raise SecurityError("Rate limit exceeded")
+                
+            self.calls.append(now)
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+class AuditLogger:
+    """
+    Secure audit logging implementation
+    """
+    def __init__(self, log_file="unicore_audit.log"):
+        self.log_file = log_file
+        self._lock = threading.Lock()
+    
+    def log(self, event_type, details):
+        """
+        Securely logs an event with timestamp and details
+        """
+        with self._lock:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            log_entry = f"{timestamp} - {event_type}: {details}\n"
+            
+            with open(self.log_file, "a") as f:
+                f.write(log_entry)
+
+def validate_type(value, expected_types, param_name="parameter"):
+    """
+    Validates that a value matches expected types.
+    
+    Args:
+        value: The value to validate
+        expected_types: Type or tuple of types to check against
+        param_name: Name of the parameter for error messages
+    
+    Raises:
+        InputValidationError: If validation fails
+    """
+    if not isinstance(value, expected_types):
+        raise InputValidationError(
+            f"Invalid type for {param_name}. Expected {expected_types}, got {type(value)}"
+        )
+    return value
+
+def validate_callable(func, param_name="parameter"):
+    """
+    Validates that a parameter is callable and safe.
+    
+    Args:
+        func: The function to validate
+        param_name: Name of the parameter for error messages
+    
+    Raises:
+        InputValidationError: If validation fails
+    """
+    if not callable(func):
+        raise InputValidationError(f"{param_name} must be callable")
+    
+    # Check if function is bound method or regular function
+    if hasattr(func, '__self__'):
+        # Bound method - validate the instance
+        validate_type(func.__self__, (object,), f"{param_name}.__self__")
+    
+    return func
+
+def sanitize_string(value, max_length=None, allowed_chars=None):
+    """
+    Sanitizes a string input.
+    
+    Args:
+        value: String to sanitize
+        max_length: Optional maximum length
+        allowed_chars: Optional regex pattern of allowed characters
+    
+    Returns:
+        Sanitized string
+    
+    Raises:
+        SanitizationError: If sanitization fails
+    """
+    if not isinstance(value, str):
+        raise SanitizationError("Value must be a string")
+    
+    # Trim whitespace
+    value = value.strip()
+    
+    # Check length
+    if max_length and len(value) > max_length:
+        raise SanitizationError(f"String exceeds maximum length of {max_length}")
+    
+    # Check allowed characters
+    if allowed_chars:
+        import re
+        if not re.match(f"^[{allowed_chars}]*$", value):
+            raise SanitizationError("String contains invalid characters")
+    
+    return value
 
 class UniCoreFW(object):
     _id_counter = 0  # Initialize the counter
@@ -24,14 +159,19 @@ class UniCoreFW(object):
         self._name = "UniCoreFW"
         self._author = "Kenny Ngo"
         self._description = "Universal Core Utility Library"
-        self.wrapper = UniCoreFWWrapper(collection)
+        self.wrapper = UniCoreFWWrapper(validate_type(collection, (list, tuple, dict, set), "collection"))
+
+  # Add rate limiting
+        self._rate_limiter = RateLimiter()
+        # Add audit logging
+        self._audit_logger = AuditLogger()
 
     def __getattr__(self, item):
         # Delegate attribute access to the wrapped instance
         if hasattr(self.wrapper, item):
-            return getattr(self.wrapper, item)
+            return getattr(self.wrapper, item, None)  # Providing a default value
         elif hasattr(UniCoreFW, item):
-            return getattr(UniCoreFW, item)
+            return getattr(UniCoreFW, item, None)  # Providing a default value
         raise AttributeError(f"'UniCoreFW' object has no attribute '{item}'")
 
     def __call__(self, collection):
@@ -61,6 +201,23 @@ class UniCoreFW(object):
         Returns:
         float: The median of the two sorted arrays.
         """
+
+        # Validate inputs
+        validate_type(nums1, (list, tuple), "nums1")
+        validate_type(nums2, (list, tuple), "nums2")
+        
+        # Validate all elements are numbers
+        for i, num in enumerate(nums1):
+            validate_type(num, (int, float), f"nums1[{i}]")
+        for i, num in enumerate(nums2):
+            validate_type(num, (int, float), f"nums2[{i}]")
+        
+        # Check for reasonable size to prevent DoS
+        max_size = 10000  # Configurable maximum
+        if len(nums1) + len(nums2) > max_size:
+            raise SecurityError("Input arrays exceed maximum allowed size")
+    
+
         # Ensure nums1 is the smaller array for binary search efficiency
         if len(nums1) > len(nums2):
             nums1, nums2 = nums2, nums1
@@ -165,8 +322,14 @@ class UniCoreFW(object):
     @staticmethod
     def map(array, func):
         """Applies func to each element of the array and returns a new array."""
-        return [func(x) for x in array]
 
+        validate_type(array, (list, tuple), "array")
+        validate_callable(func, "func")
+        
+        # Rate limiting for expensive operations
+        with RateLimiter():
+            return [func(x) for x in array]
+    
     @staticmethod
     def reduce(array, func, initial=None):
         """Reduces the array to a single value using the func and an optional initial value."""
@@ -177,6 +340,12 @@ class UniCoreFW(object):
             else:
                 result = func(result, x)
         return result
+    
+    def validate_input(value, expected_type):
+        """Validate input type and value"""
+        if not isinstance(value, expected_type):
+            raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
+        return value
 
     @staticmethod
     def find(array, func):
@@ -188,22 +357,10 @@ class UniCoreFW(object):
             - Catches and handles exceptions raised by func(x).
             - Avoids modifying the input array.
         """
-        # Input validation
-        if not hasattr(array, "__iter__"):
-            raise TypeError("The 'array' parameter must be iterable.")
-        if not callable(func):
-            raise TypeError("The 'func' parameter must be callable.")
-
-        for x in array:
-            try:
-                if func(x):
-                    return x
-            except Exception:
-                # Handle exceptions securely
-                # Optionally log the exception without exposing sensitive information
-                continue  # Skip elements that cause exceptions
-        return None
-
+        UniCoreFW.validate_input(array, (list, tuple))
+        UniCoreFW.validate_input(func, callable)
+        return next((x for x in array if func(x)), None)
+    
     @staticmethod
     def uniq(array):
         """Removes duplicates from the array."""
@@ -328,7 +485,7 @@ class UniCoreFW(object):
         # Use the Fisher-Yates shuffle algorithm, which is secure and efficient
         array_copy = list(array)
         for i in range(len(array_copy) - 1, 0, -1):
-            j = random.randint(0, i)
+            j = secrets.randbelow(i)
             array_copy[i], array_copy[j] = array_copy[j], array_copy[i]
         return array_copy
 
@@ -712,14 +869,7 @@ class UniCoreFW(object):
     @staticmethod
     def memoize(func):
         """Caches the results of function calls."""
-        cache = {}
-
-        def memoized_func(*args):
-            if args not in cache:
-                cache[args] = func(*args)
-            return cache[args]
-
-        return memoized_func
+        return lru_cache(maxsize=None)(func)
 
     # -------- Function Utilities -------- #
     @staticmethod
@@ -776,6 +926,7 @@ class UniCoreFW(object):
             with lock:
                 if timer is not None:
                     timer.cancel()
+                timer = threading.Lock()
                 timer = threading.Timer(wait_seconds, call_func)
                 timer.start()
 
@@ -824,7 +975,7 @@ class UniCoreFW(object):
     def invoke(array, func_name, *args):
         """Calls a method on each item in an array."""
         return [
-            getattr(item, func_name)(*args) if hasattr(item, func_name) else None
+            getattr(item, func_name, None)(*args) if hasattr(item, func_name) else None
             for item in array
         ]
 
@@ -983,7 +1134,7 @@ class UniCoreFW(object):
                 return self._wrapped
 
             def __getattr__(self, attr):
-                func = getattr(UniCoreFW, attr)
+                func = getattr(UniCoreFW, attr, None)
                 if callable(func):
 
                     def chainable(*args, **kwargs):
@@ -1201,12 +1352,13 @@ class UniCoreFW(object):
         """Binds specified methods of obj to obj itself."""
         for method_name in methodNames:
             if hasattr(obj, method_name):
-                bound_method = getattr(obj, method_name).__get__(obj)
+                bound_method = getattr(obj, method_name, None).__get__(obj)
                 setattr(obj, method_name, bound_method)
 
     @staticmethod
     def defer(func, *args, **kwargs):
         """Defers invoking the function until the current call stack has cleared."""
+
         threading.Timer(0, func, args=args, kwargs=kwargs).start()
 
     @staticmethod
@@ -1241,6 +1393,23 @@ class UniCoreFW(object):
 
     @staticmethod
     def template(template, context):
+        """
+        Security-enhanced version of template
+        """
+        # Validate inputs
+        template = sanitize_string(template, max_length=10000)
+        validate_type(context, dict, "context")
+        
+        # Validate context values
+        for key, value in context.items():
+            validate_type(key, str, f"context key '{key}'")
+            if callable(value):
+                validate_callable(value, f"context['{key}']")
+        
+        dangerous_patterns = "<%=.*?.__(class|bases|subclasses|globals|dict|code|builtins|module)__.*?%>"
+        if re.search(dangerous_patterns, template):
+            raise SecurityError("Potentially dangerous template pattern detected")
+
         token_pattern = r"(<%=?[^%]*?%>)"
 
         def tokenize(template):
@@ -1264,7 +1433,7 @@ class UniCoreFW(object):
                     value = call_safe_method(value, method_name)
                 else:
                     if hasattr(value, part):
-                        value = getattr(value, part)
+                        value = getattr(value, part, None)
                     else:
                         raise AttributeError(f"Attribute '{part}' not found.")
             return value
@@ -1282,7 +1451,7 @@ class UniCoreFW(object):
             # Only allow safe methods on strings
             safe_methods = {"upper", "lower", "title", "capitalize"}
             if isinstance(obj, str) and method_name in safe_methods:
-                method = getattr(obj, method_name)
+                method = getattr(obj, method_name, None)
                 return method()
             else:
                 raise ValueError(
@@ -1369,7 +1538,7 @@ class UniCoreFWWrapper(object):
         elif hasattr(self.collection, function_name) and callable(
             getattr(self.collection, function_name)
         ):
-            method = getattr(self.collection, function_name)
+            method = getattr(self.collection, function_name, None)
             result = method(*args, **kwargs)
         else:
             raise AttributeError(
@@ -1383,7 +1552,7 @@ class UniCoreFWWrapper(object):
     def _bind_unicore_functions(self, obj):
         # Attach functions from 'UniCoreFW' directly to '_'
         for func_name in dir(UniCoreFW):
-            if callable(getattr(UniCoreFW, func_name)) and not func_name.startswith("_"):
+            if callable(getattr(UniCoreFW, func_name, None)) and not func_name.startswith("_"):
                 setattr(obj, func_name, getattr(UniCoreFW, func_name))
 
         return obj

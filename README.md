@@ -1,6 +1,5 @@
 <p align="center"><img src="https://unicorefw.org/logo.png?v=1.0.2" /></p>
-
-
+ 
 |                                                                                                           | Arrays | Objects | Functions | Utilities |
 | :---------------------------------------------------------------------------------------------------------- | -------: | --------: | ----------: | ----------: |
 | **Test Status**                                                                                           |     ✓ |      ✓ |        ✓ |        ✓ |
@@ -48,8 +47,8 @@ Changelogs
 
 Installation from Pypi using PIP
 --------------------------------
-pip install unicorefw
 
+pip install unicorefw
 
 Installation from source
 ------------------------
@@ -58,10 +57,9 @@ Installation from source
    
    git clone https://github.com/unicorefw-org/unicorefw-py.git
    cd unicorefw-py
-   
 2. Ensure Python 3.x is installed on your system.
-
 3. Directory Structure
+
 ```
 project_root_dir/
 ├── src/
@@ -76,6 +74,7 @@ project_root_dir/
 
 Quick Start Guide
 -----------------
+
 ```
 from unicorefw import UniCoreFW, UniCoreFWWrapper
 
@@ -254,3 +253,5 @@ We welcome contributions to UnicoreFW! Please follow these steps:
 2. Fork the repository.
 3. Create a feature branch.
 4. Submit a pull request with a detailed description of your changes.
+   
+
