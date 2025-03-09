@@ -54,23 +54,23 @@ Installation from source
 ------------------------
 
 1. Clone the repository:
-   
+   ```
    git clone https://github.com/unicorefw-org/unicorefw-py.git
    cd unicorefw-py
-2. Ensure Python 3.x is installed on your system.
-3. Directory Structure
-
-```
-project_root_dir/
-├── src/
-│   └── unicorefw.py
-├── examples/
-│   └── sets/            # List of examples
-│   └── functions.py     # Show examples of function usage
-│   └── task_manager.py  # Sample implementations using UniCoreFW functions
-│   └── underscore.py    # Examples on how to use UniCoreFW as _
-└── README.md
-```
+   ```
+3. Ensure Python 3.x is installed on your system.
+4. Directory Structure
+  ```
+  project_root_dir/
+  ├── src/
+  │    └── unicorefw.py
+  ├── examples/
+  │    └── sets/            # List of examples
+  │    └── functions.py     # Show examples of function usage
+  │    └── task_manager.py  # Sample implementations using UniCoreFW functions
+  │    └── underscore.py    # Examples on how to use UniCoreFW as _
+  └── README.md
+   ```
 
 Quick Start Guide
 -----------------
