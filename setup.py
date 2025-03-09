@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="unicorefw",  # Name of the library
-    version="1.0.0",   # version of the library
+    version="1.0.2",   # version of the library
     author="Kenny Ngo",
     author_email="kenny@unicorefw.org",
     description="A versatile Python library for utility functions similar to Underscore.js",
