@@ -18,7 +18,7 @@ setup(
     url="https://github.com/unicorefw-org/unicorefw-py",
     project_urls={
         "Bug Tracker": "https://github.com/unicorefw-org/unicorefw-py/issues",
-        "Documentation": "https://unicorefw.org/docs",
+        "Documentation": "https://unicorefw.org/docs.html",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
