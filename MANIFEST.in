@@ -1,1 +1,3 @@
-include src/unicorefw.py
+include unicorefw/*.py
+include README.md
+include docs/guide.md
