@@ -17,8 +17,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
-class TestUnicoreArrays(unittest.TestCase):
 
+class TestUnicoreArrays(unittest.TestCase):
     # ------- Array and Collection Functions ------- #
     def test_chunk(self):
         result = UniCoreFW.chunk([1, 2, 3, 4, 5], 2)
@@ -77,7 +77,9 @@ class TestUnicoreArrays(unittest.TestCase):
         self.assertEqual(
             UniCoreFW.first([1, 2, 3]), 1, "can pull out the first element of an array"
         )
-        self.assertEqual(UniCoreFW.first([1, 2, 3]), 1, 'can perform OO-style "first()"')
+        self.assertEqual(
+            UniCoreFW.first([1, 2, 3]), 1, 'can perform OO-style "first()"'
+        )
         self.assertEqual(
             UniCoreFW.first([1, 2, 3], 0),
             [],

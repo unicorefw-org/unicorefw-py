@@ -18,6 +18,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
+
 class TestUniCoreFWFunctions(unittest.TestCase):
     def test_after(self):
         calls = []

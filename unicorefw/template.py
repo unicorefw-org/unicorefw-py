@@ -12,20 +12,21 @@ from typing import Dict, Any, Match, List
 
 from .security import SecurityError, sanitize_string
 
+
 def template(template_str: str, context: Dict[str, Any]) -> str:
     """
     Process a template string with a context of variables.
-    
+
     The template format supports variable interpolation with `<%= variable %>`
     and conditional statements with `<% if condition %>` and `<% endif %>`.
-    
+
     Args:
         template_str: The template string to process
         context: Dictionary of variables to use in the template
-        
+
     Returns:
         The processed template
-        
+
     Raises:
         ValueError: If the template contains invalid syntax
         SecurityError: If potentially dangerous patterns are detected
@@ -34,17 +35,20 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
     template_str = sanitize_string(template_str, max_length=10000)
     if not isinstance(context, dict):
         raise TypeError("Context must be a dictionary")
-    
+
     # Validate context values
     for key, value in context.items():
         if not isinstance(key, str):
             raise TypeError(f"Context key '{key}' must be a string")
         if callable(value):
             from .security import validate_callable
+
             validate_callable(value, f"context['{key}']")
-    
+
     # Check for dangerous patterns
-    dangerous_patterns = r"<%=.*?.__(class|bases|subclasses|globals|dict|code|builtins|module)__.*?%>"
+    dangerous_patterns = (
+        r"<%=.*?.__(class|bases|subclasses|globals|dict|code|builtins|module)__.*?%>"
+    )
     if re.search(dangerous_patterns, template_str):
         raise SecurityError("Potentially dangerous template pattern detected")
 
@@ -61,14 +65,14 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
     def evaluate_expression(expr: str, ctx: Dict[str, Any]) -> Any:
         """
         Evaluate a template expression.
-        
+
         Args:
             expr: The expression to evaluate
             ctx: The context dictionary
-            
+
         Returns:
             The result of the expression
-            
+
         Raises:
             ValueError: If the expression is invalid
             NameError: If a variable is not defined
@@ -99,14 +103,14 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
     def evaluate_condition(condition: str, ctx: Dict[str, Any]) -> bool:
         """
         Evaluate a template condition.
-        
+
         Args:
             condition: The condition to evaluate
             ctx: The context dictionary
-            
+
         Returns:
             True if the condition is truthy, False otherwise
-            
+
         Raises:
             ValueError: If the condition is invalid
         """
@@ -122,14 +126,14 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
     def call_safe_method(obj: Any, method_name: str) -> Any:
         """
         Call a safe method on an object.
-        
+
         Args:
             obj: The object to call the method on
             method_name: The name of the method to call
-            
+
         Returns:
             The result of the method call
-            
+
         Raises:
             ValueError: If the method is not allowed
         """
@@ -151,44 +155,44 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
 
     while idx < len(tokens):
         token = tokens[idx]
-        
+
         # Handle variable interpolation
         if token.startswith("<%=") and token.endswith("%>"):
             if not any(skip_stack):  # Only process if not in a skipped block
                 expr = token[3:-2].strip()
                 value = evaluate_expression(expr, context)
                 output += str(value)
-        
+
         # Handle control statements
         elif token.startswith("<%") and token.endswith("%>"):
             tag_content = token[2:-2].strip()
-            
+
             # if statement
             if tag_content.startswith("if "):
                 condition = tag_content[3:].rstrip(":").strip()
                 result = evaluate_condition(condition, context)
                 skip_stack.append(not result)
-            
+
             # endif statement
             elif tag_content == "endif":
                 if skip_stack:
                     skip_stack.pop()
                 else:
                     raise ValueError("Unmatched 'endif' found.")
-            
+
             # unknown tag
             else:
                 raise ValueError(f"Unknown tag '{tag_content}'.")
-        
+
         # Regular text
         else:
             if not any(skip_stack):  # Only add if not in a skipped block
                 output += token
-        
+
         idx += 1
 
     # Check for unclosed conditional blocks
     if skip_stack:
         raise ValueError("Unclosed 'if' statement detected.")
-    
+
     return output

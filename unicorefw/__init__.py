@@ -22,19 +22,21 @@ from .types import *
 from .security import *
 from .template import *
 
+
 # Create a convenience factory function for UniCoreFWWrapper
 def _(collection):
     """
     Factory function to create a UniCoreFWWrapper instance.
     This provides a shorthand similar to the Underscore.js _ function.
-    
+
     Args:
         collection: The collection to wrap
-        
+
     Returns:
         UniCoreFWWrapper: A wrapped collection
     """
     return UniCoreFWWrapper(collection)
+
 
 # Attach static methods
 for func_name in dir(UniCoreFW):
@@ -42,4 +44,4 @@ for func_name in dir(UniCoreFW):
         setattr(_, func_name, getattr(UniCoreFW, func_name))
 
 # Define what's available for import
-__all__ = ['UniCoreFW', 'UniCoreFWWrapper', '_']
+__all__ = ["UniCoreFW", "UniCoreFWWrapper", "_"]

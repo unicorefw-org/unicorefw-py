@@ -10,32 +10,34 @@ import random as random_module
 from typing import List, Tuple, Callable, TypeVar, Union, Any, Optional, Set
 import builtins  # Import Python's built-ins to avoid recursion
 
-T = TypeVar('T')
-U = TypeVar('U')
-K = TypeVar('K')
+T = TypeVar("T")
+U = TypeVar("U")
+K = TypeVar("K")
+
 
 def map(array: List[T], func: Callable[[T], U]) -> List[U]:
     """
     Apply a function to each element of an array and return a new array.
-    
+
     Args:
         array: The array to map
         func: The function to apply to each element
-        
+
     Returns:
         A new array with the results of applying func to each element
     """
     return [func(x) for x in array]
 
+
 def reduce(array: List[T], func: Callable[[U, T], U], initial: Optional[U] = None) -> U:
     """
     Reduce an array to a single value using a function.
-    
+
     Args:
         array: The array to reduce
         func: A function that takes two arguments (accumulator, current value)
         initial: The initial value for the accumulator (optional)
-        
+
     Returns:
         The reduced value
     """
@@ -47,17 +49,18 @@ def reduce(array: List[T], func: Callable[[U, T], U], initial: Optional[U] = Non
             result = func(result, x)
     return result
 
+
 def find(array: List[T], func: Callable[[T], bool]) -> Optional[T]:
     """
     Find the first element in the array that matches the predicate function.
-    
+
     Args:
         array: The array to search
         func: A predicate function that returns True for a match
-        
+
     Returns:
         The first matching element, or None if not found
-        
+
     Raises:
         TypeError: If array is not iterable or func is not callable
     """
@@ -77,26 +80,28 @@ def find(array: List[T], func: Callable[[T], bool]) -> Optional[T]:
             continue  # Skip elements that cause exceptions
     return None
 
+
 def uniq(array: List[T]) -> List[T]:
     """
     Remove duplicates from an array.
-    
+
     Args:
         array: The array to deduplicate
-        
+
     Returns:
         A new array with duplicates removed
     """
     return list(set(array))
 
+
 def first(*args, **kwargs) -> Union[T, List[T], None]:
     """
     Return the first element of an array or the first `n` elements if specified.
-    
+
     Args:
         *args: The array or array elements, and possibly `n`
         **kwargs: Optional keyword argument 'n'
-        
+
     Returns:
         The first element or first `n` elements of the array
     """
@@ -140,14 +145,15 @@ def first(*args, **kwargs) -> Union[T, List[T], None]:
 
     return array[:n]
 
+
 def last(*args, **kwargs) -> Union[T, List[T], None]:
     """
     Return the last element of an array or the last `n` elements if specified.
-    
+
     Args:
         *args: The array or array elements
         **kwargs: Optional keyword argument 'n'
-        
+
     Returns:
         The last element or last `n` elements of the array
     """
@@ -181,39 +187,42 @@ def last(*args, **kwargs) -> Union[T, List[T], None]:
 
     return array[-n:]
 
+
 def compact(array: List[Any]) -> List[Any]:
     """
     Remove falsey values from an array.
-    
+
     Args:
         array: The array to compact
-        
+
     Returns:
         A new array with falsey values removed
     """
     return [x for x in array if x]
 
+
 def without(array: List[T], *values) -> List[T]:
     """
     Return an array excluding all provided values.
-    
+
     Args:
         array: The array to filter
         *values: The values to exclude
-        
+
     Returns:
         A new array with specified values removed
     """
     return [x for x in array if x not in values]
 
+
 def pluck(array: List[dict], key: str) -> List[Any]:
     """
     Extract a list of property values from an array of objects.
-    
+
     Args:
         array: An array of objects
         key: The property key to extract
-        
+
     Returns:
         A list of the property values
     """
@@ -222,13 +231,14 @@ def pluck(array: List[dict], key: str) -> List[Any]:
         for obj in array
     ]
 
+
 def shuffle(array: List[T]) -> List[T]:
     """
     Randomly shuffle the values in an array.
-    
+
     Args:
         array: The array to shuffle
-        
+
     Returns:
         A new shuffled array
     """
@@ -239,38 +249,41 @@ def shuffle(array: List[T]) -> List[T]:
         array_copy[i], array_copy[j] = array_copy[j], array_copy[i]
     return array_copy
 
+
 def zip(*arrays) -> List[Tuple]:
     """
     Combine multiple arrays into an array of tuples.
-    
+
     Args:
         *arrays: The arrays to zip
-        
+
     Returns:
         A list of tuples
     """
     return list(builtins.zip(*arrays))
 
+
 def unzip(array_of_tuples: List[Tuple]) -> List[List]:
     """
     Reverse the zip operation by separating tuples into arrays.
-    
+
     Args:
         array_of_tuples: An array of tuples
-        
+
     Returns:
         A list of arrays
     """
     return list(builtins.map(list, builtins.zip(*array_of_tuples)))
 
+
 def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
     """
     Partition an array into two lists based on a predicate.
-    
+
     Args:
         array: The array to partition
         predicate: A function that returns True or False
-        
+
     Returns:
         A list of two lists [truthy, falsy]
     """
@@ -278,14 +291,15 @@ def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
     falsy = [item for item in array if not predicate(item)]
     return [truthy, falsy]
 
+
 def last_index_of(array: List[T], value: T) -> int:
     """
     Return the last index of a specified value in an array.
-    
+
     Args:
         array: The array to search
         value: The value to find
-        
+
     Returns:
         The last index of the value, or -1 if not found
     """
@@ -294,61 +308,67 @@ def last_index_of(array: List[T], value: T) -> int:
             return i
     return -1
 
+
 def chunk(array: List[T], size: int) -> List[List[T]]:
     """
     Split an array into chunks of specified size.
-    
+
     Args:
         array: The array to chunk
         size: The chunk size
-        
+
     Returns:
         A list of chunks
     """
     return [array[i : i + size] for i in builtins.range(0, len(array), size)]
 
+
 def initial(array: List[T], n: int = 1) -> List[T]:
     """
     Return all elements except the last n elements.
-    
+
     Args:
         array: The array
         n: Number of elements to exclude from the end
-        
+
     Returns:
         A new array without the last n elements
     """
     return array[:-n] if n < len(array) else []
 
+
 def rest(array: List[T], n: int = 1) -> List[T]:
     """
     Return all elements except the first n elements.
-    
+
     Args:
         array: The array
         n: Number of elements to exclude from the start
-        
+
     Returns:
         A new array without the first n elements
     """
     return array[n:]
 
+
 def contains(array: List[T], value: T) -> bool:
     """
     Check if a value is present in the array.
-    
+
     Args:
         array: The array to search
         value: The value to find
-        
+
     Returns:
         True if the value is in the array, False otherwise
     """
     return value in array
-def flatten(array, depth=float('inf')):
+
+
+def flatten(array, depth=float("inf")):
     """
     Flatten a nested array structure.
-    
+
     Args:
         array: The array to flatten
                - If None, returns an empty list
@@ -356,37 +376,39 @@ def flatten(array, depth=float('inf')):
                - If True, flattens only one level (shallow)
                - If a number, flattens to that depth (negative treated as 0)
                - If not specified or infinity, flattens completely
-    
+
     Returns:
         A new flattened array
     """
     # Handle None
     if array is None:
         return []
-    
+
     # Convert True to depth of 1 for shallow flattening
     if depth is True:
         depth = 1
-    
+
     # Treat negative depth as 0
     if isinstance(depth, (int, float)) and depth < 0:
         depth = 0
-    
+
     # Return original array if depth is 0
     if depth == 0:
         return array
-    
+
     result = []
-    
+
     # Handle the case where array might not be directly iterable
     try:
         # Try to iterate over the array
         for item in array:
             # Check if item is an iterable, but not a string
-            if hasattr(item, '__iter__') and not isinstance(item, str):
+            if hasattr(item, "__iter__") and not isinstance(item, str):
                 if depth > 0:
                     # Recursively flatten with reduced depth
-                    flattened = flatten(item, depth - 1 if depth != float('inf') else depth)
+                    flattened = flatten(
+                        item, depth - 1 if depth != float("inf") else depth
+                    )
                     result.extend(flattened)
                 else:
                     result.append(item)
@@ -395,64 +417,69 @@ def flatten(array, depth=float('inf')):
     except TypeError:
         # If array is not iterable, treat it as a single item
         return [array]
-    
+
     return result
+
 
 def reject(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     """
     Return items that do not match the predicate.
-    
+
     Args:
         array: The array to filter
         predicate: A function that returns True for items to reject
-        
+
     Returns:
         A new array with rejected items removed
     """
     return [x for x in array if not predicate(x)]
 
+
 def filter(array: List[T], func: Callable[[T], bool]) -> List[T]:
     """
     Filter elements in array based on func predicate.
-    
+
     Args:
         array: The array to filter
         func: A function that returns True for items to keep
-        
+
     Returns:
         A new array with only matching items
     """
     return [x for x in array if func(x)]
 
+
 def sample(array: List[T], n: int = 1) -> Union[List[T], T]:
     """
     Return a random sample from an array.
-    
+
     Args:
         array: The array to sample from
         n: Number of items to sample
-        
+
     Returns:
         A list of sampled items or a single item if n=1
     """
     if n <= 0:
         return []
-    
+
     from random import sample as random_sample
+
     result = random_sample(array, min(n, len(array)))
-    
+
     if n == 1 and len(result) == 1:
         return result[0]
     return result
 
+
 def index_by(array: List[dict], key_func: Union[str, Callable]) -> dict:
     """
     Index the array by a specific key or a function.
-    
+
     Args:
         array: An array of objects
         key_func: A string key or a function that returns a key
-        
+
     Returns:
         A dictionary indexed by the key or function result
     """
@@ -461,17 +488,18 @@ def index_by(array: List[dict], key_func: Union[str, Callable]) -> dict:
     else:
         return {key_func(item): item for item in array}
 
+
 def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
     """
     Count instances in an array based on a function's result.
-    
+
     Args:
         array: The array to count
         key_func: A function that returns a grouping key
-        
+
     Returns:
         A dictionary of counts by key
-        
+
     Raises:
         TypeError: If array is not iterable or key_func is not callable
     """
@@ -479,7 +507,7 @@ def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
         raise TypeError("The 'array' parameter must be iterable.")
     if not callable(key_func):
         raise TypeError("The 'key_func' parameter must be callable.")
-    
+
     counts = {}
     for item in array:
         try:
@@ -489,78 +517,83 @@ def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
             # Handle exceptions securely
             # Optionally log the exception without exposing sensitive information
             continue  # Skip elements that cause exceptions
-    
+
     return counts
+
 
 def difference(array: List[T], *others) -> List[T]:
     """
     Return values from the first array not present in others.
-    
+
     Args:
         array: The source array
         *others: Other arrays to check against
-        
+
     Returns:
         An array of unique values in the first array but not in others
     """
     other_elements = set().union(*others)
     return [x for x in array if x not in other_elements]
 
+
 def union(*arrays) -> List:
     """
     Combine arrays and remove duplicates.
-    
+
     Args:
         *arrays: Arrays to combine
-        
+
     Returns:
         A new array with unique values from all input arrays
     """
     return list(set().union(*arrays))
 
+
 def intersection(*arrays) -> List:
     """
     Return an array of values common to all arrays.
-    
+
     Args:
         *arrays: Arrays to intersect
-        
+
     Returns:
         A new array with values present in all input arrays
     """
     if not arrays:
         return []
-    
+
     common_elements = set(arrays[0])
     for arr in arrays[1:]:
         common_elements.intersection_update(arr)
-    
+
     return list(common_elements)
+
 
 def sort_by(array: List[T], key_func: Callable[[T], Any]) -> List[T]:
     """
     Sort an array by a function or key.
-    
+
     Args:
         array: The array to sort
         key_func: A function that returns a comparable value
-        
+
     Returns:
         A new sorted array
     """
     return sorted(array, key=key_func)
 
+
 def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
     """
     Group array elements by the result of a function.
-    
+
     Args:
         array: The array to group
         key_func: A function that returns a grouping key
-        
+
     Returns:
         A dictionary with keys from key_func and arrays as values
-        
+
     Raises:
         TypeError: If array is not iterable or key_func is not callable
     """
@@ -568,7 +601,7 @@ def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
         raise TypeError("The 'array' parameter must be iterable.")
     if not callable(key_func):
         raise TypeError("The 'key_func' parameter must be callable.")
-    
+
     grouped = {}
     for item in array:
         try:
@@ -578,18 +611,19 @@ def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
             # Handle exceptions securely
             # Optionally log the exception without exposing sensitive information
             continue  # Skip elements that cause exceptions
-    
+
     return grouped
+
 
 def range(start: int, stop: Optional[int] = None, step: int = 1) -> List[int]:
     """
     Generate an array of numbers in a range.
-    
+
     Args:
         start: Start number or stop if stop is None
         stop: End number (exclusive)
         step: Step between numbers
-        
+
     Returns:
         A list of numbers
     """
@@ -597,7 +631,10 @@ def range(start: int, stop: Optional[int] = None, step: int = 1) -> List[int]:
         start, stop = 0, start
     return list(builtins.range(start, stop, step))
 
-def max_value(array: List[T], key_func: Optional[Callable[[T], Any]] = None) -> Optional[T]:
+
+def max_value(
+    array: List[T], key_func: Optional[Callable[[T], Any]] = None
+) -> Optional[T]:
     """
     Return the maximum value in the array, based on an optional key function.
     Returns None if the array is empty.
@@ -609,7 +646,9 @@ def max_value(array: List[T], key_func: Optional[Callable[[T], Any]] = None) -> 
     return builtins.max(array)
 
 
-def min_value(array: List[T], key_func: Optional[Callable[[T], Any]] = None) -> Optional[T]:
+def min_value(
+    array: List[T], key_func: Optional[Callable[[T], Any]] = None
+) -> Optional[T]:
     """
     Return the minimum value in the array, based on an optional key function.
     Returns None if the array is empty.
@@ -620,14 +659,15 @@ def min_value(array: List[T], key_func: Optional[Callable[[T], Any]] = None) -> 
         return builtins.min(array, key=key_func)
     return builtins.min(array)
 
+
 def find_median_sorted_arrays(nums1: List[float], nums2: List[float]) -> float:
     """
     Find the median of two sorted arrays using binary search.
-    
+
     Args:
         nums1: First sorted array
         nums2: Second sorted array
-        
+
     Returns:
         The median value
     """
