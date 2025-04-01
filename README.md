@@ -1,14 +1,13 @@
-<p align="center"><img src="https://unicorefw.org/logo.png?v=1.0.2" /></p>
- 
-|                                                                                                           | Arrays | Objects | Functions | Utilities |
-| :---------------------------------------------------------------------------------------------------------- | -------: | --------: | ----------: | ----------: |
-| **Test Status**                                                                                           |     ✓ |      ✓ |        ✓ |        ✓ |
-| **Build Status**                                                                                          |      ✓ |      ✓ |        ✓ |        ✓ |
-| ![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg) |        |         |           |           |
+<p align="center"><img src="https://unicorefw.org/img/logo.png?v=1.0.2" /></p>
+
+|                        | Arrays | Objects | Functions | Utilities |
+| :--------------------- | -----: | ------: | --------: | --------: |
+| **Test Status**  |     ✓ |      ✓ |        ✓ |        ✓ |
+| **Build Status** |     ✓ |      ✓ |        ✓ |        ✓ |
+
 # UniCoreFW
 
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
 
 **Universal Core Utility Library**
 
@@ -21,8 +20,6 @@ UniCoreFW is a comprehensive utility library that provides a wide range of funct
 - **Chainable API**: Similar to libraries like Lodash/Underscore
 - **Comprehensive Toolset**: 100+ utility functions organized into logical categories
 - **Type Checking**: Extensive type checking and validation utilities
-
-
 
 Changelogs
 ----------
@@ -53,11 +50,13 @@ Changelogs
 * **RateLimiter** :
   * Implements rate limiting to prevent DoS attacks.
   * Supports `max_calls` and `time_window` configuration.
+
 ## Installation from Pypi using PIP
 
 ```bash
 pip install unicorefw
 ```
+
 Installation from source
 ------------------------
 
@@ -98,7 +97,7 @@ result = (_([1, 2, 3, 4, 5])
             .map(lambda x: x * 2)
             .filter(lambda x: x > 5)
             .value())
-            
+          
 print(f"Chained result: {result}")  # Output: [6, 8, 10]
 
 # Static method example
@@ -235,9 +234,12 @@ context = {"name": "John", "role": "Admin"}
 rendered = UniCoreFW.template(template, context)
 # "Hello, John! Your role is: Admin."
 ```
+
 **PYTHON IMPLEMENTATION**
----
+---------------------
+
 # Architecture
+
 **UniCoreFW**	 is Primary class that providing static utility methods	like UniCoreFW.method_name(arguments)
 
 **UniCoreFWWrapper** is Wrapper class that enables method chaining like UniCoreFWWrapper(collection).method1().method2().value()
@@ -372,6 +374,7 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 
 - `_.chain` – Starts a chain.
 - `_.value` – Extracts the value at the end of a chain.
+
 ## Why UniCoreFW?
 
 ### Universality
