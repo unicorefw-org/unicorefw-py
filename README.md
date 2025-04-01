@@ -4,7 +4,8 @@
 | :--------------------- | -----: | ------: | --------: | --------: |
 | **Test Status**  |     ✓ |      ✓ |        ✓ |        ✓ |
 | **Build Status** |     ✓ |      ✓ |        ✓ |        ✓ |
-![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg) ![Unit Tests](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml/badge.svg)
+
+[!Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg) [!Unit Tests](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml/badge.svg)
 # UniCoreFW
 
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
