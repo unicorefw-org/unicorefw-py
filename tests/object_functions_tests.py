@@ -21,6 +21,19 @@ from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
 
 class TestUniCoreFWObjects(unittest.TestCase):
+    def test_deep_copy(self):
+        data = {
+            "numbers": [1, 2, 3],
+            "nested": {"x": 10, "y": [100, 101]},
+        }
+        copy_data = UniCoreFW.deep_copy(data)
+
+        self.assertEqual(copy_data, data, "Deep-copied object should match original")
+        self.assertIsNot(copy_data, data, "Should not be the same reference (dict)")
+        self.assertIsNot(copy_data["numbers"], data["numbers"], "Inner list should also be copied")
+        self.assertIsNot(copy_data["nested"], data["nested"], "Nested dict should be copied")
+        self.assertIsNot(copy_data["nested"]["y"], data["nested"]["y"], "Nested list should be copied")
+
     def test_all_keys(self):
         obj = {"a": 1, "b": 2, "c": 3}
         self.assertEqual(

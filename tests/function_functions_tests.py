@@ -20,6 +20,27 @@ from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
 
 class TestUniCoreFWFunctions(unittest.TestCase):
+    def test_matches(self):
+        # matches(attrs) returns a function that checks if an object has those attrs
+        checker = UniCoreFW.matches({"a": 1, "b": 2})
+        self.assertTrue(checker({"a": 1, "b": 2, "c": 3}))
+        self.assertFalse(checker({"a": 1, "b": 9}))
+        self.assertFalse(checker({"a": 1}))
+
+    def test_property_func(self):
+        # property_func("someKey") => returns a function that fetches obj["someKey"] or obj.someKey
+        get_name = UniCoreFW.property_func("name")
+        self.assertEqual(get_name({"name": "Alice"}), "Alice")
+        # Non-dict fallback
+        class Person:
+            def __init__(self, name):
+                self.name = name
+
+        bob = Person("Bob")
+        self.assertEqual(get_name(bob), "Bob")
+
+        # Missing property => None
+        self.assertIsNone(get_name({}))
     def test_after(self):
         calls = []
 

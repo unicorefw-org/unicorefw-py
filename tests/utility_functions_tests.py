@@ -20,6 +20,32 @@ from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
 
 class TestUnicoreUtilities(unittest.TestCase):
+    def test_compress_decompress(self):
+        original = "aaabbbbccddaaa"
+        compressed = UniCoreFW.compress(original)
+        # Basic check => run-length encoded but max of 9 in a chunk
+        # Example: "3a4b2c2d3a", etc. (Exact format depends on your code.)
+        self.assertNotEqual(compressed, original, "Should compress repeated chars")
+
+        round_trip = UniCoreFW.decompress(compressed)
+        self.assertEqual(round_trip, original, "Decompressed should match original")
+
+    def test_compress_empty(self):
+        self.assertEqual(UniCoreFW.compress(""), "")
+
+    def test_decompress_empty(self):
+        self.assertEqual(UniCoreFW.decompress(""), "")
+
+    def test_compress_multi_digit_counts(self):
+        # If the string has more than 9 consecutive same chars, the code loops them in blocks of 9
+        big_string = "aaaaaaaaaaaa"  # 12 'a'
+        compressed = UniCoreFW.compress(big_string)
+        # Should produce something like "9a3a" 
+        self.assertIn("9a", compressed)
+        self.assertIn("3a", compressed)
+        decompressed = UniCoreFW.decompress(compressed)
+        self.assertEqual(decompressed, big_string)
+            
     def test_chain(self):
         result = (
             UniCoreFW.chain([1, 2, 3])

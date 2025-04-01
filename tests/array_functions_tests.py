@@ -123,7 +123,50 @@ class TestUnicoreArrays(unittest.TestCase):
         self.assertEqual(
             UniCoreFW.first([]), None, "return undefined when called on a empty array"
         )
+    def test_find(self):
+        arr = [1, 2, 3, 4]
+        # Should find the first element matching x > 2
+        found = UniCoreFW.find(arr, lambda x: x > 2)
+        self.assertEqual(found, 3)
 
+        # Should return None if no match
+        not_found = UniCoreFW.find(arr, lambda x: x > 10)
+        self.assertIsNone(not_found)
+
+        # Test exception-safety (func that might raise)
+        def raiser(x):
+            if x == 3:
+                raise ValueError("Test error")
+            return False
+
+        # Should skip elements that cause exceptions
+        found_exception = UniCoreFW.find(arr, raiser)
+        self.assertIsNone(found_exception)
+
+    def test_last(self):
+        # Single list argument
+        self.assertEqual(UniCoreFW.last([1, 2, 3]), 3, "Should return the last element")
+
+        # last n elements
+        self.assertEqual(UniCoreFW.last([1, 2, 3, 4], n=2), [3, 4])
+
+        # Edge cases
+        self.assertIsNone(UniCoreFW.last([]), "Empty list => None")
+        self.assertEqual(UniCoreFW.last([], n=3), [], "Empty list => empty list when n specified")
+
+        # Multiple args scenario
+        self.assertEqual(UniCoreFW.last(5, 6, 7), 7, "If called like last(5,6,7) => returns the last argument")
+
+    def test_uniq(self):
+        arr = [1, 2, 2, 3, 1, 4]
+        uniq_arr = UniCoreFW.uniq(arr)
+        # Because set-based deduplication is not guaranteed to preserve order,
+        # the function returns a list but order may vary. Let's check content:
+        self.assertEqual(set(uniq_arr), {1, 2, 3, 4})
+        self.assertEqual(len(uniq_arr), 4, "Should remove duplicates")
+        
+        # Edge case: empty array
+        self.assertEqual(UniCoreFW.uniq([]), [])
     def test_flatten(self):
         result = UniCoreFW.flatten([1, [2, [3, 4]], 5], 2)
         self.assertEqual(result, [1, 2, 3, 4, 5])
