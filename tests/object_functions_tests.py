@@ -16,10 +16,32 @@ import sys
 import os
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from unicorefw import UniCoreFW  # Now you can import Unicore as usual
 
+
 class TestUniCoreFWObjects(unittest.TestCase):
+    def test_deep_copy(self):
+        data = {
+            "numbers": [1, 2, 3],
+            "nested": {"x": 10, "y": [100, 101]},
+        }
+        copy_data = UniCoreFW.deep_copy(data)
+
+        self.assertEqual(copy_data, data, "Deep-copied object should match original")
+        self.assertIsNot(copy_data, data, "Should not be the same reference (dict)")
+        self.assertIsNot(
+            copy_data["numbers"], data["numbers"], "Inner list should also be copied"
+        )
+        self.assertIsNot(
+            copy_data["nested"], data["nested"], "Nested dict should be copied"
+        )
+        self.assertIsNot(
+            copy_data["nested"]["y"],
+            data["nested"]["y"],
+            "Nested list should be copied",
+        )
+
     def test_all_keys(self):
         obj = {"a": 1, "b": 2, "c": 3}
         self.assertEqual(
@@ -95,7 +117,9 @@ class TestUniCoreFWObjects(unittest.TestCase):
         from array import array
 
         buffer = array("i", [1, 2, 3])
-        self.assertTrue(UniCoreFW.is_array_buffer(buffer), "Should recognize array buffer")
+        self.assertTrue(
+            UniCoreFW.is_array_buffer(buffer), "Should recognize array buffer"
+        )
 
     def test_is_boolean(self):
         self.assertTrue(
@@ -161,14 +185,17 @@ class TestUniCoreFWObjects(unittest.TestCase):
 
     def test_is_function(self):
         self.assertTrue(
-            UniCoreFW.is_function(lambda x: x), "Lambda should be recognized as a function"
+            UniCoreFW.is_function(lambda x: x),
+            "Lambda should be recognized as a function",
         )
         self.assertFalse(
             UniCoreFW.is_function(5), "5 should not be recognized as a function"
         )
 
     def test_is_map(self):
-        self.assertTrue(UniCoreFW.is_map({}), "Dictionary should be recognized as a map")
+        self.assertTrue(
+            UniCoreFW.is_map({}), "Dictionary should be recognized as a map"
+        )
         self.assertFalse(UniCoreFW.is_map([]), "List should not be recognized as a map")
 
     def test_is_match(self):
@@ -176,7 +203,9 @@ class TestUniCoreFWObjects(unittest.TestCase):
         self.assertFalse(UniCoreFW.is_match({"a": 1, "b": 2}, {"a": 2}))
 
     def test_is_nan(self):
-        self.assertTrue(UniCoreFW.is_nan(float("nan")), "NaN should be recognized as NaN")
+        self.assertTrue(
+            UniCoreFW.is_nan(float("nan")), "NaN should be recognized as NaN"
+        )
         self.assertFalse(UniCoreFW.is_nan(10), "10 should not be recognized as NaN")
 
     def test_is_null(self):

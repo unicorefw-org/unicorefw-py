@@ -1,29 +1,36 @@
-<p align="center"><img src="https://unicorefw.org/logo.png?v=1.0.2" /></p>
- 
-|                                                                                                           | Arrays | Objects | Functions | Utilities |
-| :---------------------------------------------------------------------------------------------------------- | -------: | --------: | ----------: | ----------: |
-| **Test Status**                                                                                           |     ✓ |      ✓ |        ✓ |        ✓ |
-| **Build Status**                                                                                          |      ✓ |      ✓ |        ✓ |        ✓ |
-| ![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg) |        |         |           |           |
+<p align="center"><img src="https://unicorefw.org/img/logo.png?v=1.0.2" /></p>
 
----
+|                        | Arrays | Objects | Functions | Utilities |
+| :--------------------- | -----: | ------: | --------: | --------: |
+| **Test Status**  |     ✓ |      ✓ |        ✓ |        ✓ |
+| **Build Status** |     ✓ |      ✓ |        ✓ |        ✓ |
 
-Overview
---------
+[![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)](https://pypistats.org/packages/unicorefw) [![Unit Tests](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml/badge.svg)](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml)
+# UniCoreFW
 
-UniCoreFW-PY, a part of UniCoreFW.org is a Python-based framework based on UnderscoreJS, designed to offer a comprehensive set of utilities and functional programming tools. This framework is equipped with command-line capabilities that allow users to execute example scripts, parse custom command-line arguments, and integrate powerful utility methods for various use cases. The goal of UnicoreFW is to provide security, performance, and ease of use for developers looking to build and maintain Python applications.
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
 
-Features
---------
+**Universal Core Utility Library**
 
-* **Flexible Test Execution**: Run example scripts through the command line for rapid prototyping and testing.
-* **Utility Functions**: Includes a robust set of utility methods for functional programming, string manipulation, and more.
-* **Secure Execution**: Built-in security measures to safely execute code and handle user inputs.
+UniCoreFW is a comprehensive utility library that provides a wide range of functions for arrays, objects, functions, and more, all with a focus on universality, security, and performance.
+
+## Features
+
+- **Security-First Design**: Built-in input validation, rate limiting, and audit logging
+- **Functional Programming**: Map, reduce, filter, and other higher-order functions
+- **Chainable API**: Similar to libraries like Lodash/Underscore
+- **Comprehensive Toolset**: 100+ utility functions organized into logical categories
+- **Type Checking**: Extensive type checking and validation utilities
 
 Changelogs
 ----------
 
-## Version 1.0.2 
+## Version 1.0.3
+
+* **Restructured:** unicorefw.py
+* **Updated:** flatten()  to improve performance
+
+## Version 1.0.2
 
 * **Removed:** `import random`
 * **Added:** `import secrets`
@@ -43,27 +50,37 @@ Changelogs
 
 * **RateLimiter** :
   * Implements rate limiting to prevent DoS attacks.
-  * Supports`max_calls` and`time_window` configuration.
+  * Supports `max_calls` and `time_window` configuration.
 
-Installation from Pypi using PIP
---------------------------------
+## Installation from Pypi using PIP
 
+```bash
 pip install unicorefw
+```
 
 Installation from source
 ------------------------
 
 1. Clone the repository:
-   
+```bash
    git clone https://github.com/unicorefw-org/unicorefw-py.git
    cd unicorefw-py
+```
 2. Ensure Python 3.x is installed on your system.
 3. Directory Structure
 
 ```
 project_root_dir/
-├── src/
-│   └── unicorefw.py
+├── unicorefw/
+│   └── __init__
+│   └── array.py
+│   └── core.py
+│   └── function.py
+│   └── object.py
+│   └── security.py
+│   └── template.py
+│   └── types.py
+│   └── utils.py
 ├── examples/
 │   └── sets/            # List of examples
 │   └── functions.py     # Show examples of function usage
@@ -72,40 +89,162 @@ project_root_dir/
 └── README.md
 ```
 
-Quick Start Guide
------------------
+## Quick Start
 
-```
-from unicorefw import UniCoreFW, UniCoreFWWrapper
+```python
+from unicorefw import _, UniCoreFW, UniCoreFWWrapper
 
-def _(collection):
-return UniCoreFWWrapper(collection)
+# Chaining example
+result = (_([1, 2, 3, 4, 5])
+            .map(lambda x: x * 2)
+            .filter(lambda x: x > 5)
+            .value())
+          
+print(f"Chained result: {result}")  # Output: [6, 8, 10]
 
-# Attach functions from 'Unicore' directly to '_'
-
-for func_name in dir(UniCoreFW):
-if callable(getattr(UniCoreFW, func_name)) and not func_name.startswith("_"):
-setattr(_, func_name, getattr(UniCoreFW, func_name))
-
-# Example usage:
-result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value()
-print(result)  # Expected output: [6, 8, 10]
-
-# Using a static function call
+# Static method example
 template = "Name: <%= name %>, Age: <%= age %>"
 context = {"name": "Alice", "age": 25}
-result = _.template(template, context)
-print(result)  # Expected output: "Name: Alice, Age: 25"
+print(f"Template result: {_.template(template, context)}")  
+# Output: "Name: Alice, Age: 25"
+
+# Multiple operations example
+data = [
+    {"name": "Alice", "age": 25, "active": True},
+    {"name": "Bob", "age": 30, "active": False},
+    {"name": "Charlie", "age": 35, "active": True}
+]
+
+active_names = (_(data)
+                .filter(lambda x: x.get("active", False))
+                .pluck("name")
+                .value())
+print(f"Active users: {active_names}")  # Output: ['Alice', 'Charlie']
+
+# Demonstrate static vs chained methods
+array = [1, 2, 3, 4, 5]
+print(f"Static map: {_.map(array, lambda x: x * 3)}")
+print(f"Chained map: {_(array).map(lambda x: x * 3).value()}")
 ```
 
-Documention
------------
+## Core Modules
 
-Please see `docs/guide.md` for more information.
+### Array Functions
+
+```python
+# Map, filter, reduce
+mapped = UniCoreFW.map([1, 2, 3], lambda x: x * 2)  # [2, 4, 6]
+filtered = UniCoreFW.filter([1, 2, 3, 4], lambda x: x % 2 == 0)  # [2, 4]
+reduced = UniCoreFW.reduce([1, 2, 3, 4], lambda a, b: a + b, 0)  # 10
+
+# Array manipulation
+first = UniCoreFW.first([1, 2, 3], n=2)  # [1, 2]
+last = UniCoreFW.last([1, 2, 3], n=2)  # [2, 3]
+flattened = UniCoreFW.flatten([1, [2, [3, 4]]])  # [1, 2, 3, 4]
+chunked = UniCoreFW.chunk([1, 2, 3, 4, 5, 6], 2)  # [[1, 2], [3, 4], [5, 6]]
+```
+
+### Object Functions
+
+```python
+# Object manipulation
+keys = UniCoreFW.keys({"a": 1, "b": 2})  # ["a", "b"]
+values = UniCoreFW.values({"a": 1, "b": 2})  # [1, 2]
+extended = UniCoreFW.extend({"a": 1}, {"b": 2}, {"c": 3})  # {"a": 1, "b": 2, "c": 3}
+
+# Object creation
+obj = UniCoreFW.object(["a", "b"], [1, 2])  # {"a": 1, "b": 2}
+```
+
+### Function Utilities
+
+```python
+# Function transformation
+def add(a, b):
+    return a + b
+
+add_5 = UniCoreFW.partial(add, 5)  # Creates a new function that adds 5
+result = add_5(10)  # 15
+
+# Execution control
+throttled = UniCoreFW.throttle(expensive_function, 1000)  # Max once per second
+debounced = UniCoreFW.debounce(on_input_change, 300)  # Wait for 300ms of inactivity
+memoized = UniCoreFW.memoize(fibonacci)  # Cache results for repeated calls
+```
+
+### Security Utilities
+
+```python
+from unicorefw import validate_type, validate_callable, sanitize_string
+
+# Input validation
+validate_type("test", str, "string_param")
+validate_callable(lambda x: x, "function_param")
+
+# String sanitization
+safe_input = sanitize_string(user_input, max_length=100, allowed_chars="a-zA-Z0-9")
+
+# Rate limiting
+with RateLimiter(max_calls=100, time_window=60):
+    perform_api_request()
+
+# Audit logging
+logger = AuditLogger(log_file="security.log")
+logger.log("LOGIN", "User authenticated successfully")
+```
+
+### Special Algorithms
+
+```python
+# Find median of two sorted arrays
+median = UniCoreFW.find_median_sorted_arrays([1, 3, 5], [2, 4, 6])  # 3.5
+
+# String compression
+compressed = UniCoreFW.compress("aaabbc")  # "3a2b1c"
+decompressed = UniCoreFW.decompress("3a2b3c")  # "aaabbccc"
+```
+
+## Advanced Examples
+
+### Data Processing Pipeline
+
+```python
+def process_data(items):
+    return (_(items)
+            .filter(lambda x: x["active"])
+            .sort_by(lambda x: x["priority"])
+            .map(lambda x: {
+                "id": x["id"],
+                "status": "High" if x["priority"] > 5 else "Low"
+            })
+            .value())
+
+result = process_data([
+    {"id": 1, "active": True, "priority": 7},
+    {"id": 2, "active": False, "priority": 3},
+    {"id": 3, "active": True, "priority": 4}
+])
+# [{"id": 3, "status": "Low"}, {"id": 1, "status": "High"}]
+```
+
+### Secure Template Rendering
+
+```python
+template = "Hello, <%= name %>! Your role is: <%= role %>."
+context = {"name": "John", "role": "Admin"}
+
+rendered = UniCoreFW.template(template, context)
+# "Hello, John! Your role is: Admin."
+```
 
 **PYTHON IMPLEMENTATION**
+---------------------
 
----
+# Architecture
+
+**UniCoreFW**	 is Primary class that providing static utility methods	like UniCoreFW.method_name(arguments)
+
+**UniCoreFWWrapper** is Wrapper class that enables method chaining like UniCoreFWWrapper(collection).method1().method2().value()
 
 This class, `UniCoreFW`, provides a wide range of utility functions for working with arrays, objects, and strings. Here's a summary of what each method does:
 
@@ -238,20 +377,28 @@ This class, `UniCoreFW`, provides a wide range of utility functions for working 
 - `_.chain` – Starts a chain.
 - `_.value` – Extracts the value at the end of a chain.
 
-Security Considerations
------------------------
+## Why UniCoreFW?
 
-* **Safe Execution**: The framework ensures that code execution is sandboxed and limited in scope to avoid unwanted side effects.
-* **Input Validation**: Command-line inputs are validated to prevent invalid or malicious commands.
+### Universality
 
-Contributing
-------------
+UniCoreFW provides consistent APIs across different environments and use cases, allowing you to write cleaner, more maintainable code.
 
-We welcome contributions to UnicoreFW! Please follow these steps:
+### Security
 
-1. Follow principles in CODE_OF_CONDUCT.md
-2. Fork the repository.
-3. Create a feature branch.
-4. Submit a pull request with a detailed description of your changes.
-   
+Every function is designed with security in mind, including input validation, rate limiting, and audit logging capabilities.
 
+### Performance
+
+Functions are optimized for minimal overhead, suitable for both small applications and enterprise-level systems.
+
+## License
+
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Authors
+
+- **Kenny Ngo** - *Initial work* - [UniCoreFW.Org](https://unicorefw.org) / [IIPTech.info](https://iiptech.info)

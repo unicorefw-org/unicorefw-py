@@ -17,20 +17,9 @@ import sys
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Ensure the 'src' directory is in sys.path for Unicore imports
-sys.path.insert(0, os.path.join(BASE_DIR, "../src"))
+sys.path.insert(0, os.path.join(BASE_DIR, ".."))
 
-from unicorefw import UniCoreFW, UniCoreFWWrapper
-
-
-def _(collection):
-    return UniCoreFWWrapper(collection)
-
-
-# Attach functions from 'Unicore' directly to '_'
-for func_name in dir(UniCoreFW):
-    if callable(getattr(UniCoreFW, func_name)) and not func_name.startswith("_"):
-        setattr(_, func_name, getattr(UniCoreFW, func_name))
-
+from unicorefw import _
 
 # Example usage:
 result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value()
@@ -41,3 +30,11 @@ template = "Name: <%= name %>, Age: <%= age %>"
 context = {"name": "Alice", "age": 25}
 result = _.template(template, context)
 print(result)  # Expected output: "Name: Alice, Age: 25"
+
+# Example chain: reverse -> slice -> value
+result = (
+    _("Hello world")
+    .kebab_case()
+    .reverse()
+)
+print(result.value())

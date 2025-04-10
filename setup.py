@@ -1,26 +1,40 @@
+"""
+Setup script for UniCoreFW package.
+"""
+
 from setuptools import setup, find_packages
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setup(
-    name="unicorefw",  # Name of the library
-    version="1.0.2",   # version of the library
+    name="unicorefw",
+    version="1.0.3",
     author="Kenny Ngo",
     author_email="kenny@unicorefw.org",
-    description="A versatile Python library for utility functions similar to Underscore.js",
-    long_description=open("README.md").read(),
+    description="Universal Core Utility Library",
+    long_description=long_description,
     long_description_content_type="text/markdown",
-    license="BSD-3-Clause",
-    url="https://github.com/unicorefw-org/unicorefw-py",  # GitHub repo or project page
-    packages=find_packages("src"),
-    package_dir={"": "src"},
+    url="https://github.com/unicorefw-org/unicorefw-py",
+    project_urls={
+        "Bug Tracker": "https://github.com/unicorefw-org/unicorefw-py/issues",
+        "Documentation": "https://unicorefw.org/docs.html",
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
+        "Intended Audience :: Developers",
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    py_modules=["unicorefw"],
-    exclude=["examples", "tests", "utils", "benchmark", "docs"],
-    python_requires=">=3.6",
-    install_requires=[  
-        # List dependencies here
-    ],
+    py_modules=["unicorefw"],    
+    package_dir={"": "."},
+    exclude=["examples", "tests", "utils", "benchmark", "docs"],    
+    packages=find_packages(),
+    python_requires=">=3.7",
+    install_requires=[],
 )
