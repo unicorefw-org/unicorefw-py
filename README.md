@@ -27,8 +27,71 @@ Changelogs
 
 ## Version 1.0.3
 
-* **Restructured:** unicorefw.py
-* **Updated:** flatten()  to improve performance
+Architecture Changes
+--------------------
+
+*   **Removed:** `unicorefw.py` (monolithic file)
+*   **Updated:** `__init__.py` (improved module loading)
+*   **Added:** Modular architecture with specialized components:
+    *   `array.py` - Array manipulation utilities
+    *   `core.py` - Core framework functionality
+    *   `crypto.py` - Cryptography capabilities
+    *   `function.py` - Function manipulation tools
+    *   `object.py` - Object-oriented utilities
+    *   `security.py` - Security features
+    *   `string.py` - String manipulation utilities
+    *   `template.py` - Templating system
+    *   `types.py` - Type handling and validation
+    *   `utils.py` - General utilities
+
+New Features
+------------
+
+### String Transformations
+
+The framework now includes a comprehensive set of string manipulation utilities:
+
+*   `reverse(string: str)` - Reverse a string
+*   `camel_case(string: str)` - Convert string to camelCase
+*   `snake_case(string: str, flag: bool = True)` - Convert string to snake\_case
+*   `kebab_case(string: str)` - Convert string to kebab-case
+*   `truncate(string: str, length: int, ellipsis: str = "...")` - Truncate string with ellipsis
+*   `starts_with(string: str, prefix: str)` - Check if string starts with prefix
+*   `ends_with(string: str, suffix: str)` - Check if string ends with suffix
+*   `words(string: str, pattern: Optional[str] = None)` - Extract words from string
+*   `humanize(string: str)` - Convert string to human-readable format
+*   `slice(string: str, start: int = 0, end: Optional[int] = None)` - Extract substring
+*   `replace_all(string: str, find: str, replacement: str)` - Replace all occurrences
+*   `regex_find_all(string: str, pattern: str, flags: int = 0)` - Find all regex matches
+*   `regex_test(string: str, pattern: str, flags: int = 0)` - Test if regex pattern matches
+*   `regex_replace` - Replace text using regex
+*   `regex_extract` - Extract first match using regex
+*   `regex_extract_all` - Extract all matches using regex
+*   `strip_html_tags(string: str)` - Remove HTML tags from string
+*   `slugify(string: str, delimiter: str = "-")` - Convert string to URL-friendly slug
+*   `mask_sensitive(string: str, pattern: str, mask_char: str = "*")` - Mask sensitive data
+*   `highlight_matches` - Highlight matching patterns in text
+*   `normalize_whitespace(string: str)` - Normalize whitespace characters
+*   `dedent_text(string: str)` - Remove common leading whitespace
+
+### Cryptography APIs
+
+New security features for data protection:
+
+*   `generate_key()` - Generate secure encryption key
+*   `encrypt_string(plaintext: str, key: bytes)` - Encrypt string data
+*   `decrypt_string(ciphertext: str, key: bytes)` - Decrypt encrypted string
+
+Links
+-----
+
+*   **Full Documentation**: [https://unicorefw.org](https://unicorefw.org)
+*   **Full Changelog**: [https://github.com/unicorefw-org/unicorefw-py/compare/v1.0.2...v1.0.3](https://github.com/unicorefw-org/unicorefw-py/compare/v1.0.2...v1.0.3)
+
+Migration Guide
+---------------
+
+Users upgrading from v1.0.2 should review the documentation for breaking changes. Most functionality from `unicorefw.py` has been preserved but moved to specialized modules.
 
 ## Version 1.0.2
 
