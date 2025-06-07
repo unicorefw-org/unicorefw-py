@@ -6,6 +6,7 @@
 | **Build Status** |     ✓ |      ✓ |        ✓ |        ✓ |
 
 [![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)](https://pypistats.org/packages/unicorefw) [![Unit Tests](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml/badge.svg)](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml)
+
 # UniCoreFW
 
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/downloads/)
@@ -25,95 +26,8 @@ UniCoreFW is a comprehensive utility library that provides a wide range of funct
 Changelogs
 ----------
 
-## Version 1.0.3
+Please visit: [Releases](https://github.com/unicorefw-org/unicorefw-py/releases)
 
-Architecture Changes
---------------------
-
-*   **Removed:** `unicorefw.py` (monolithic file)
-*   **Updated:** `__init__.py` (improved module loading)
-*   **Added:** Modular architecture with specialized components:
-    *   `array.py` - Array manipulation utilities
-    *   `core.py` - Core framework functionality
-    *   `crypto.py` - Cryptography capabilities
-    *   `function.py` - Function manipulation tools
-    *   `object.py` - Object-oriented utilities
-    *   `security.py` - Security features
-    *   `string.py` - String manipulation utilities
-    *   `template.py` - Templating system
-    *   `types.py` - Type handling and validation
-    *   `utils.py` - General utilities
-
-New Features
-------------
-
-### String Transformations
-
-The framework now includes a comprehensive set of string manipulation utilities:
-
-*   `reverse(string: str)` - Reverse a string
-*   `camel_case(string: str)` - Convert string to camelCase
-*   `snake_case(string: str, flag: bool = True)` - Convert string to snake\_case
-*   `kebab_case(string: str)` - Convert string to kebab-case
-*   `truncate(string: str, length: int, ellipsis: str = "...")` - Truncate string with ellipsis
-*   `starts_with(string: str, prefix: str)` - Check if string starts with prefix
-*   `ends_with(string: str, suffix: str)` - Check if string ends with suffix
-*   `words(string: str, pattern: Optional[str] = None)` - Extract words from string
-*   `humanize(string: str)` - Convert string to human-readable format
-*   `slice(string: str, start: int = 0, end: Optional[int] = None)` - Extract substring
-*   `replace_all(string: str, find: str, replacement: str)` - Replace all occurrences
-*   `regex_find_all(string: str, pattern: str, flags: int = 0)` - Find all regex matches
-*   `regex_test(string: str, pattern: str, flags: int = 0)` - Test if regex pattern matches
-*   `regex_replace` - Replace text using regex
-*   `regex_extract` - Extract first match using regex
-*   `regex_extract_all` - Extract all matches using regex
-*   `strip_html_tags(string: str)` - Remove HTML tags from string
-*   `slugify(string: str, delimiter: str = "-")` - Convert string to URL-friendly slug
-*   `mask_sensitive(string: str, pattern: str, mask_char: str = "*")` - Mask sensitive data
-*   `highlight_matches` - Highlight matching patterns in text
-*   `normalize_whitespace(string: str)` - Normalize whitespace characters
-*   `dedent_text(string: str)` - Remove common leading whitespace
-
-### Cryptography APIs
-
-New security features for data protection:
-
-*   `generate_key()` - Generate secure encryption key
-*   `encrypt_string(plaintext: str, key: bytes)` - Encrypt string data
-*   `decrypt_string(ciphertext: str, key: bytes)` - Decrypt encrypted string
-
-Links
------
-
-*   **Full Documentation**: [https://unicorefw.org](https://unicorefw.org)
-*   **Full Changelog**: [https://github.com/unicorefw-org/unicorefw-py/compare/v1.0.2...v1.0.3](https://github.com/unicorefw-org/unicorefw-py/compare/v1.0.2...v1.0.3)
-
-Migration Guide
----------------
-
-Users upgrading from v1.0.2 should review the documentation for breaking changes. Most functionality from `unicorefw.py` has been preserved but moved to specialized modules.
-
-## Version 1.0.2
-
-* **Removed:** `import random`
-* **Added:** `import secrets`
-* **Added:** `from functools import lru_cache`
-* **Added:** `lock = threading.Lock()`
-* **Added:** `counter = 0`
-
-#### New Features:
-
-* Implemented a robust security foundation with new exception classes:
-  * `SecurityError`: Base exception for security-related errors.
-  * `InputValidationError`: Raised when input validation fails.
-  * `AuthorizationError`: Raised when authorization checks fail.
-  * `SanitizationError`: Raised when data sanitization fails.
-
-#### New Class:
-
-* **RateLimiter** :
-  * Implements rate limiting to prevent DoS attacks.
-  * Supports `max_calls` and `time_window` configuration.
 
 ## Installation from Pypi using PIP
 
@@ -125,10 +39,12 @@ Installation from source
 ------------------------
 
 1. Clone the repository:
+
 ```bash
-   git clone https://github.com/unicorefw-org/unicorefw-py.git
+git clone https://github.com/unicorefw-org/unicorefw-py.git
    cd unicorefw-py
 ```
+
 2. Ensure Python 3.x is installed on your system.
 3. Directory Structure
 
@@ -465,3 +381,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Authors
 
 - **Kenny Ngo** - *Initial work* - [UniCoreFW.Org](https://unicorefw.org) / [IIPTech.info](https://iiptech.info)
+
