@@ -287,10 +287,10 @@ def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
     Returns:
         A list of two lists [truthy, falsy]
     """
-    truthy = [item for item in array if predicate(item)]
-    falsy = [item for item in array if not predicate(item)]
+    truthy, falsy = [], []
+    for item in array:
+        (truthy if predicate(item) else falsy).append(item)
     return [truthy, falsy]
-
 
 def last_index_of(array: List[T], value: T) -> int:
     """
@@ -364,62 +364,37 @@ def contains(array: List[T], value: T) -> bool:
     """
     return value in array
 
-
 def flatten(array, depth=float("inf")):
     """
-    Flatten a nested array structure.
+    Flatten a nested list structure to the given depth using an iterative approach.
 
     Args:
-        array: The array to flatten
-               - If None, returns an empty list
-        depth: How deep to flatten the array
-               - If True, flattens only one level (shallow)
-               - If a number, flattens to that depth (negative treated as 0)
-               - If not specified or infinity, flattens completely
+        array: List or iterable to flatten
+        depth: Maximum depth to flatten to (0 = no flatten, inf = full flatten)
 
     Returns:
-        A new flattened array
+        Flattened list
     """
-    # Handle None
     if array is None:
         return []
 
-    # Convert True to depth of 1 for shallow flattening
     if depth is True:
         depth = 1
-
-    # Treat negative depth as 0
-    if isinstance(depth, (int, float)) and depth < 0:
-        depth = 0
-
-    # Return original array if depth is 0
-    if depth == 0:
+    elif isinstance(depth, (int, float)) and depth < 0:
         return array
 
     result = []
+    stack = [(array, depth)]
 
-    # Handle the case where array might not be directly iterable
-    try:
-        # Try to iterate over the array
-        for item in array:
-            # Check if item is an iterable, but not a string
-            if hasattr(item, "__iter__") and not isinstance(item, str):
-                if depth > 0:
-                    # Recursively flatten with reduced depth
-                    flattened = flatten(
-                        item, depth - 1 if depth != float("inf") else depth
-                    )
-                    result.extend(flattened)
-                else:
-                    result.append(item)
-            else:
-                result.append(item)
-    except TypeError:
-        # If array is not iterable, treat it as a single item
-        return [array]
+    while stack:
+        current, current_depth = stack.pop()
+        if isinstance(current, list) and current_depth > 0:
+            for item in reversed(current):
+                stack.append((item, current_depth - 1 if current_depth != float("inf") else current_depth))
+        else:
+            result.append(current)
 
     return result
-
 
 def reject(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     """

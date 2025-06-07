@@ -332,26 +332,25 @@ def functions(obj: Dict) -> List[str]:
         if callable(value) and not key.startswith("__")
     ]
 
-
-def deep_copy(obj: Any) -> Any:
-    """
-    Create a deep copy of the given object without using imports.
-
-    Args:
-        obj: The object to copy
-
-    Returns:
-        A deep copy of the object
-    """
+def deep_copy(obj, _memo=None):
+    if _memo is None:
+        _memo = {}
+    obj_id = id(obj)
+    if obj_id in _memo:
+        return _memo[obj_id]
     if isinstance(obj, dict):
-        return {k: deep_copy(v) for k, v in obj.items()}
+        copy_obj = {}
+        _memo[obj_id] = copy_obj
+        for k, v in obj.items():
+            copy_obj[deep_copy(k, _memo)] = deep_copy(v, _memo)
+        return copy_obj
     elif isinstance(obj, list):
-        return [deep_copy(elem) for elem in obj]
+        copy_obj = []
+        _memo[obj_id] = copy_obj
+        copy_obj.extend(deep_copy(item, _memo) for item in obj)
+        return copy_obj
     elif isinstance(obj, tuple):
-        return tuple(deep_copy(elem) for elem in obj)
-    elif isinstance(obj, str):
-        # Strings are immutable, return as is
-        return obj
-    else:
-        # For immutable objects like int, float, return as is
-        return obj
+        copy_obj = tuple(deep_copy(item, _memo) for item in obj)
+        _memo[obj_id] = copy_obj
+        return copy_obj
+    return obj

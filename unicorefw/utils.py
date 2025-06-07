@@ -224,23 +224,19 @@ def compress(word: str) -> str:
     """
     if not word:
         return ""
-
     comp = []  # Use a list for faster concatenation
     length = len(word)
     i = 0
-
     while i < length:
         count = 1
         # Count up to 9 consecutive characters
         while i + count < length and word[i] == word[i + count] and count < 9:
             count += 1
-
         # Append the count and character to comp
         comp.append(f"{count}{word[i]}")
 
         # Move to the next distinct character
         i += count
-
     return "".join(comp)  # Join the list into a single string at the end
 
 
@@ -256,22 +252,16 @@ def decompress(comp: str) -> str:
     """
     result = []
     i = 0
-
     while i < len(comp):
-        # Extract the number (count of characters)
         count = 0
         while i < len(comp) and comp[i].isdigit():
-            count = count * 10 + int(comp[i])  # Handle multi-digit counts
+            count = count * 10 + int(comp[i])
             i += 1
-
-        # Extract the character
         if i < len(comp):
             char = comp[i]
-            result.append(char * count)  # Append repeated character
+            result.append(char * count)
             i += 1
-
-    return "".join(result)
-
+    return ''.join(result)
 
 def max_value(
     array: List[T], key_func: Optional[Callable[[T], Any]] = None

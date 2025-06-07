@@ -348,26 +348,24 @@ def is_symbol(obj: Any) -> bool:
         obj, (types.ModuleType, types.BuiltinFunctionType, types.FunctionType, type)
     )
 
-
-def is_equal(obj1: Any, obj2: Any) -> bool:
-    """
-    Perform a deep comparison between two objects for equality.
-
-    Args:
-        obj1: First object to compare
-        obj2: Second object to compare
-
-    Returns:
-        True if objects are deeply equal, False otherwise
-    """
-    if type(obj1) != type(obj2):
+def is_equal(obj1, obj2, _seen=None):
+    if _seen is None:
+        _seen = set()
+    pair = (id(obj1), id(obj2))
+    if pair in _seen:
+        return True  # Avoids infinite recursion on cycles
+    _seen.add(pair)
+    if type(obj1) != type(obj2):  # noqa: E721
         return False
     if isinstance(obj1, dict):
         if len(obj1) != len(obj2):
             return False
-        return all(k in obj2 and is_equal(v, obj2[k]) for k, v in obj1.items())
-    elif isinstance(obj1, list):
+        for k in obj1:
+            if k not in obj2 or not is_equal(obj1[k], obj2[k], _seen):
+                return False
+        return True
+    elif isinstance(obj1, (list, tuple)):
         if len(obj1) != len(obj2):
             return False
-        return all(is_equal(x, y) for x, y in zip(obj1, obj2))
+        return all(is_equal(x, y, _seen) for x, y in zip(obj1, obj2))
     return obj1 == obj2
