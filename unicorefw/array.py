@@ -375,6 +375,7 @@ def flatten(array, depth=float("inf")):
     Returns:
         Flattened list
     """
+    depth += 1
     if array is None:
         return []
 
