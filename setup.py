@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="unicorefw",
-    version="1.0.3",
+    version="1.0.4",
     author="Kenny Ngo",
     author_email="kenny@unicorefw.org",
     description="Universal Core Utility Library",
