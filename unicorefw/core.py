@@ -9,8 +9,9 @@ Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
 
 # import threading
 # import time
-import inspect
 # import sys
+import inspect
+
 
 # Import function categories
 from . import array
@@ -41,7 +42,7 @@ class UniCoreFW:
         Args:
             collection: The collection to wrap with UniCoreFWWrapper
         """
-        self._version = "1.0.3"
+        self._version = "1.0.6"
         self._name = "UniCoreFW"
         self._author = "Kenny Ngo"
         self._description = "Universal Core Utility Library"
@@ -183,11 +184,6 @@ for module in [array, object, string, crypto, function, utils, types, security, 
     for name, func in inspect.getmembers(module, inspect.isfunction):
         if not name.startswith('_'):
             setattr(UniCoreFW, name, staticmethod(func))
-
-# Dynamically create wrapper methods for UniCoreFWWrapper
-for module in [array, object, string, crypto, function, utils, types]:
-    for name, func in inspect.getmembers(module, inspect.isfunction):
-        if not name.startswith('_') and not hasattr(UniCoreFWWrapper, name):
             def create_wrapper_method(func_name):
                 def wrapper_method(self, *args, **kwargs):
                     return self._apply_unicore_function(func_name, *args, **kwargs)

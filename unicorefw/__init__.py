@@ -7,7 +7,7 @@ A comprehensive suite of utility functions for Python applications.
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
 """
 
-__version__ = "1.0.3"
+__version__ = "1.0.6"
 __author__ = "Kenny Ngo"
 
 # Import the main classes

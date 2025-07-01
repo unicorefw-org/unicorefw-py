@@ -348,24 +348,50 @@ def is_symbol(obj: Any) -> bool:
         obj, (types.ModuleType, types.BuiltinFunctionType, types.FunctionType, type)
     )
 
-def is_equal(obj1, obj2, _seen=None):
+
+def is_equal(obj1: Any, obj2: Any, _seen=None) -> bool:
+    """
+    Perform a deep comparison between two objects for equality.
+
+    This function is equivalent to :func:`operator.eq` except that it can handle
+    nested dictionaries, lists, tuples, and sets.
+
+    Args:
+        obj1: The first object to compare
+        obj2: The second object to compare
+        _seen: Set of seen objects to avoid infinite recursion on cycles
+
+    Returns:
+        True if objects are deeply equal, False otherwise
+    """
+    if obj1 is obj2:
+        return True
+
+    if type(obj1) is not type(obj2):
+        return False
+
+    if isinstance(obj1, (int, float, str, bool, type(None))):
+        return obj1 == obj2
+
     if _seen is None:
         _seen = set()
+
     pair = (id(obj1), id(obj2))
     if pair in _seen:
-        return True  # Avoids infinite recursion on cycles
-    _seen.add(pair)
-    if type(obj1) != type(obj2):  # noqa: E721
-        return False
-    if isinstance(obj1, dict):
-        if len(obj1) != len(obj2):
-            return False
-        for k in obj1:
-            if k not in obj2 or not is_equal(obj1[k], obj2[k], _seen):
-                return False
         return True
-    elif isinstance(obj1, (list, tuple)):
+    _seen.add(pair)
+
+    if isinstance(obj1, dict):
+        if obj1.keys() != obj2.keys():
+            return False
+        return all(is_equal(obj1[k], obj2[k], _seen) for k in obj1)
+
+    if isinstance(obj1, (list, tuple, set)):
         if len(obj1) != len(obj2):
             return False
+        if isinstance(obj1, set):
+            return obj1 == obj2  # sets can be compared directly
         return all(is_equal(x, y, _seen) for x, y in zip(obj1, obj2))
+
+    # Fallback for objects not specifically handled
     return obj1 == obj2

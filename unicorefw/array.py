@@ -287,10 +287,10 @@ def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
     Returns:
         A list of two lists [truthy, falsy]
     """
-    truthy, falsy = [], []
-    for item in array:
-        (truthy if predicate(item) else falsy).append(item)
+    truthy = [item for item in array if predicate(item)]
+    falsy = [item for item in array if not predicate(item)]
     return [truthy, falsy]
+
 
 def last_index_of(array: List[T], value: T) -> int:
     """
@@ -364,18 +364,20 @@ def contains(array: List[T], value: T) -> bool:
     """
     return value in array
 
+
 def flatten(array, depth=float("inf")):
     """
-    Flatten a nested list structure to the given depth using an iterative approach.
+    Efficiently flatten a nested list structure to the given depth using an iterative approach.
 
     Args:
-        array: List or iterable to flatten
-        depth: Maximum depth to flatten to (0 = no flatten, inf = full flatten)
+        array: A list to flatten (supports nested lists)
+        depth: Maximum depth to flatten. Use `True` for shallow (depth=1), float('inf') for full flatten.
 
     Returns:
-        Flattened list
+        Flattened list.
     """
-    depth += 1
+    depth+=1
+    
     if array is None:
         return []
 
@@ -389,13 +391,16 @@ def flatten(array, depth=float("inf")):
 
     while stack:
         current, current_depth = stack.pop()
-        if isinstance(current, list) and current_depth > 0:
+        if isinstance(current, list) and current_depth != 0:
+            # We reverse for correct left-to-right processing via LIFO
             for item in reversed(current):
                 stack.append((item, current_depth - 1 if current_depth != float("inf") else current_depth))
         else:
             result.append(current)
 
     return result
+
+
 
 def reject(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     """
