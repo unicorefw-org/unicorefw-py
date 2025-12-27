@@ -54,7 +54,7 @@ class UniCoreFW:
     _author = "Kenny Ngo"
     _email = "kenny@unicorefw.org"
     _description = "Universal Core Utility Library"
-    _version = "1.1.1"
+    _version = "1.1.2"
     _id_counter = 0  # Initialize the counter
 
     def __init__(self, collection):
