@@ -33,26 +33,26 @@ jobs:
         
     - name: Perform tests
       run: |
-        pytest tests/array_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_array*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
 
     - name: Test object functions
       run: |
-        pytest tests/object_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_object*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
         
     - name: Test function functions
       run: |
-        pytest tests/function_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_function*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
 
     - name: Test utility functions
       run: |
-        pytest tests/utility_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_utils.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
 
     - name: Test security functions
       run: |
-        pytest tests/security_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_security.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
     - name: Test template functions
       run: |
-        pytest tests/template_functions_tests.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_template.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
         
     # - name: Upload coverage to Codecov
     #   uses: codecov/codecov-action@v3
