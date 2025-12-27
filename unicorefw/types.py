@@ -1,16 +1,22 @@
 """
+File: unicorefw/types.py
 Type checking functions for UniCoreFW.
 
 This module contains functions for checking and validating types.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
-"""
 
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
+"""
 import re
 import types
-from typing import Any
 import math
-
+from collections.abc import Sequence, Set
+from typing import Any, List, Mapping, Tuple
 
 def is_string(obj: Any) -> bool:
     """
@@ -21,6 +27,10 @@ def is_string(obj: Any) -> bool:
 
     Returns:
         True if obj is a string, False otherwise
+
+    Examples:
+        >>> is_string('hello')
+        True
     """
     return isinstance(obj, str)
 
@@ -34,6 +44,10 @@ def is_number(obj: Any) -> bool:
 
     Returns:
         True if obj is a number, False otherwise
+
+    Examples:
+        >>> is_number(1)
+        True
     """
     return isinstance(obj, (int, float))
 
@@ -47,6 +61,10 @@ def is_array(obj: Any) -> bool:
 
     Returns:
         True if obj is a list, False otherwise
+    
+    Examples:
+        >>> is_array([1, 2, 3])
+        True
     """
     return isinstance(obj, list)
 
@@ -60,7 +78,12 @@ def is_object(obj: Any) -> bool:
 
     Returns:
         True if obj is a dictionary, False otherwise
-    """
+    
+    Examples:
+        >>> is_object({'a': 1, 'b': 2})
+        True
+
+   """
     return isinstance(obj, dict)
 
 
@@ -73,6 +96,10 @@ def is_function(obj: Any) -> bool:
 
     Returns:
         True if obj is callable, False otherwise
+    
+    Examples:
+        >>> is_function(lambda x: x)
+        True
     """
     return callable(obj)
 
@@ -86,6 +113,10 @@ def is_boolean(obj: Any) -> bool:
 
     Returns:
         True if obj is a boolean, False otherwise
+    
+    Examples:
+        >>> is_boolean(True)
+        True
     """
     return isinstance(obj, bool)
 
@@ -99,6 +130,10 @@ def is_date(obj: Any) -> bool:
 
     Returns:
         True if obj is a date, False otherwise
+    
+    Examples:
+        >>> is_date(date.today())
+        True
     """
     from datetime import date
 
@@ -114,6 +149,10 @@ def is_reg_exp(obj: Any) -> bool:
 
     Returns:
         True if obj is a regular expression, False otherwise
+    
+    Examples:
+        >>> is_reg_exp(re.compile('.*'))
+        True
     """
     return isinstance(obj, re.Pattern)
 
@@ -127,6 +166,9 @@ def is_error(obj: Any) -> bool:
 
     Returns:
         True if obj is an exception, False otherwise
+    Examples:
+        >>> is_error(Exception())
+        True
     """
     return isinstance(obj, Exception)
 
@@ -140,6 +182,10 @@ def is_null(obj: Any) -> bool:
 
     Returns:
         True if obj is None, False otherwise
+
+    Examples:
+        >>> is_null(None)
+        True
     """
     return obj is None
 
@@ -153,6 +199,10 @@ def is_undefined(obj: Any) -> bool:
 
     Returns:
         True if obj is None, False otherwise
+    
+    Examples:
+        >>> is_undefined(None)
+        True
     """
     return obj is None
 
@@ -166,6 +216,10 @@ def is_finite(obj: Any) -> bool:
 
     Returns:
         True if obj is a finite number, False otherwise
+    
+    Examples:
+        >>> is_finite(1)
+        True
     """
     return isinstance(obj, (int, float)) and math.isfinite(obj)
 
@@ -179,6 +233,10 @@ def is_nan(obj: Any) -> bool:
 
     Returns:
         True if obj is NaN, False otherwise
+
+    Examples:
+        >>> is_nan(float('nan'))
+        True
     """
     return isinstance(obj, float) and math.isnan(obj)
 
@@ -192,6 +250,10 @@ def is_map(obj: Any) -> bool:
 
     Returns:
         True if obj is a dictionary, False otherwise
+
+    Examples:
+        >>> is_map({'a': 1, 'b': 2})
+        True
     """
     return isinstance(obj, dict)
 
@@ -205,6 +267,10 @@ def is_set(obj: Any) -> bool:
 
     Returns:
         True if obj is a set, False otherwise
+
+    Examples:
+        >>> is_set(set([1, 2, 3]))
+        True
     """
     return isinstance(obj, set)
 
@@ -218,6 +284,10 @@ def is_arguments(obj: Any) -> bool:
 
     Returns:
         True if obj is a tuple, False otherwise
+    
+    Examples:
+        >>> is_arguments((1, 2, 3))
+        True
     """
     return isinstance(obj, tuple)
 
@@ -231,6 +301,11 @@ def is_array_buffer(obj: Any) -> bool:
 
     Returns:
         True if obj is an array.array, False otherwise
+
+    Examples:
+        >>> from array import array
+        >>> is_array_buffer(array('i', [1, 2, 3]))
+        True
     """
     import array
 
@@ -246,6 +321,11 @@ def is_data_view(obj: Any) -> bool:
 
     Returns:
         True if obj is a memoryview, False otherwise
+
+    Examples:
+        >>> from array import array
+        >>> is_data_view(memoryview(array('i', [1, 2, 3])))
+        True
     """
     return isinstance(obj, memoryview)
 
@@ -259,6 +339,11 @@ def is_typed_array(obj: Any) -> bool:
 
     Returns:
         True if obj is an array.array, False otherwise
+    
+    Examples:
+        >>> from array import array
+        >>> is_typed_array(array('i', [1, 2, 3]))
+        True
     """
     from array import array
 
@@ -274,6 +359,11 @@ def is_weak_map(obj: Any) -> bool:
 
     Returns:
         True if obj is a WeakKeyDictionary, False otherwise
+
+    Examples:
+        >>> from weakref import WeakKeyDictionary
+        >>> is_weak_map(WeakKeyDictionary())
+        True
     """
     from weakref import WeakKeyDictionary
 
@@ -289,6 +379,11 @@ def is_weak_set(obj: Any) -> bool:
 
     Returns:
         True if obj is a WeakSet, False otherwise
+    
+    Examples:
+        >>> from weakref import WeakSet
+        >>> is_weak_set(WeakSet())
+        True
     """
     from weakref import WeakSet
 
@@ -304,6 +399,11 @@ def is_element(obj: Any) -> bool:
 
     Returns:
         True if obj is an Element, False otherwise
+    
+    Examples:
+        >>> from xml.etree.ElementTree import Element
+        >>> is_element(Element("foo"))
+        True
     """
     try:
         from xml.etree.ElementTree import Element
@@ -322,15 +422,20 @@ def is_empty(obj: Any) -> bool:
 
     Returns:
         True if obj is empty, False otherwise
+    
+    Examples:
+        >>> is_empty([])
+        True
+        >>> is_empty({})
+        True
     """
-    if obj is None:
+    # any non-collection primitive (no __len__ and no __iter__) is "empty"
+    if not hasattr(obj, "__len__") and not hasattr(obj, "__iter__"):
         return True
     if hasattr(obj, "__len__"):
         return len(obj) == 0
-    if hasattr(obj, "__iter__"):
-        return not any(True for _ in obj)
-    return False
-
+    # objects with __iter__ but no __len__ (e.g. generators)
+    return not any(True for _ in obj)
 
 def is_symbol(obj: Any) -> bool:
     """
@@ -348,50 +453,94 @@ def is_symbol(obj: Any) -> bool:
         obj, (types.ModuleType, types.BuiltinFunctionType, types.FunctionType, type)
     )
 
-
-def is_equal(obj1: Any, obj2: Any, _seen=None) -> bool:
+def is_equal(obj1: Any, obj2: Any) -> bool:
     """
-    Perform a deep comparison between two objects for equality.
+    Deep equality with cycle handling and fast paths.
 
-    This function is equivalent to :func:`operator.eq` except that it can handle
-    nested dictionaries, lists, tuples, and sets.
+    Semantics:
+      - Requires exact same type (type(a) is type(b)), like your original.
+      - dict/Mapping: keys must match; values compared deeply.
+      - list/tuple/Sequence (not str/bytes/bytearray): order matters.
+      - set/frozenset/Set: order doesn't matter (direct equality).
+      - Other types fall back to ==.
+      - No special-casing for NaN (NaN != NaN), preserving original behavior.
+
+    Complexity: O(N) in the total number of elements visited across both structures.
 
     Args:
-        obj1: The first object to compare
-        obj2: The second object to compare
-        _seen: Set of seen objects to avoid infinite recursion on cycles
+        obj1: First object to compare
+        obj2: Second object to compare
 
     Returns:
         True if objects are deeply equal, False otherwise
+
+    Examples:
+        >>> is_equal([1, 2, 3], [1, 2, 3])
+        True
     """
     if obj1 is obj2:
         return True
-
     if type(obj1) is not type(obj2):
         return False
 
-    if isinstance(obj1, (int, float, str, bool, type(None))):
+    # Fast-path for common immutables
+    if isinstance(obj1, (int, float, str, bool, type(None), bytes, bytearray, memoryview, range)):
         return obj1 == obj2
 
-    if _seen is None:
-        _seen = set()
+    # Iterative DFS with cycle detection on (id(a), id(b)) pairs
+    seen: set[Tuple[int, int]] = set()
+    stack: List[Tuple[Any, Any]] = [(obj1, obj2)]
 
-    pair = (id(obj1), id(obj2))
-    if pair in _seen:
-        return True
-    _seen.add(pair)
-
-    if isinstance(obj1, dict):
-        if obj1.keys() != obj2.keys():
+    while stack:
+        a, b = stack.pop()
+        if a is b:
+            continue
+        if type(a) is not type(b):
             return False
-        return all(is_equal(obj1[k], obj2[k], _seen) for k in obj1)
 
-    if isinstance(obj1, (list, tuple, set)):
-        if len(obj1) != len(obj2):
+        pid = (id(a), id(b))
+        if pid in seen:
+            continue
+        seen.add(pid)
+
+        # Re-check fast-path for inner elements
+        if isinstance(a, (int, float, str, bool, type(None), bytes, bytearray, memoryview, range)):
+            if a != b:
+                return False
+            continue
+
+        # Mappings: keys must match; push value pairs
+        if isinstance(a, Mapping):
+            # Quick reject on size or key set mismatch
+            if len(a) != len(b):  # type: ignore[arg-type]
+                return False
+            # Using mapping view equality is O(n) and order-insensitive
+            if a.keys() != b.keys():  # type: ignore[arg-type]
+                return False
+            # Compare corresponding values
+            for k in a.keys():
+                stack.append((a[k], b[k]))  # type: ignore[index]
+            continue
+
+        # Sets (unordered)
+        if isinstance(a, Set) and not isinstance(a, (str, bytes, bytearray)):
+            # Direct set equality is fine
+            if a != b:  # type: ignore[comparison-overlap]
+                return False
+            continue
+
+        # Sequences (ordered) – but exclude string/bytes-like
+        if isinstance(a, Sequence) and not isinstance(a, (str, bytes, bytearray)):
+            if len(a) != len(b):  # type: ignore[arg-type]
+                return False
+            # Push in order so mismatches are caught early
+            # (iterate by index to avoid zip generator overhead)
+            for i in range(len(a)):  # type: ignore[arg-type]
+                stack.append((a[i], b[i]))  # type: ignore[index]
+            continue
+
+        # Fallback for everything else (custom objects, etc.)
+        if a != b:
             return False
-        if isinstance(obj1, set):
-            return obj1 == obj2  # sets can be compared directly
-        return all(is_equal(x, y, _seen) for x, y in zip(obj1, obj2))
 
-    # Fallback for objects not specifically handled
-    return obj1 == obj2
+    return True

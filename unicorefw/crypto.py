@@ -1,4 +1,5 @@
 """
+File: unicorefw/crypto.py
 Encryption and decryption utilities for UniCoreFW.
 
 This module provides basic string encryption/decryption using the 'cryptography' library
@@ -6,16 +7,25 @@ This module provides basic string encryption/decryption using the 'cryptography'
 management, and error handling meet security best practices.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
+
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 try:
-    from cryptography.fernet import Fernet, InvalidToken
+    from cryptography.fernet import Fernet, InvalidToken # type: ignore
 
     CRYPTO_AVAILABLE = True
 except ImportError:
     # If cryptography isn't installed, these functions won't work
     CRYPTO_AVAILABLE = False
 
+class InvalidToken(ValueError):
+    """Raised when data sanitization fails."""
+    pass
 
 def generate_key() -> bytes:
     """
@@ -26,10 +36,15 @@ def generate_key() -> bytes:
 
     Raises:
         RuntimeError: If 'cryptography' is not installed.
+
+    Examples:
+        key = generate_key()
+        encrypted_string = encrypt_string("my_secret_data", key)
+        decrypted_string = decrypt_string(encrypted_string, key)
     """
     if not CRYPTO_AVAILABLE:
         raise RuntimeError("cryptography library is not installed.")
-    return Fernet.generate_key()
+    return Fernet.generate_key() # type: ignore
 
 
 def encrypt_string(plaintext: str, key: bytes) -> str:
@@ -45,10 +60,15 @@ def encrypt_string(plaintext: str, key: bytes) -> str:
 
     Raises:
         RuntimeError: If 'cryptography' is not installed.
+
+    Examples:
+        key = generate_key()
+        encrypted_string = encrypt_string("my_secret_data", key)
+        decrypted_string = decrypt_string(encrypted_string, key)
     """
     if not CRYPTO_AVAILABLE:
         raise RuntimeError("cryptography library is not installed.")
-    f = Fernet(key)
+    f = Fernet(key) # type: ignore
     token = f.encrypt(plaintext.encode("utf-8"))
     return token.decode("utf-8")
 
@@ -67,10 +87,15 @@ def decrypt_string(ciphertext: str, key: bytes) -> str:
     Raises:
         RuntimeError: If 'cryptography' is not installed.
         ValueError: If the token is invalid or cannot be decrypted.
+
+    Examples:
+        key = generate_key()
+        encrypted_string = encrypt_string("my_secret_data", key)
+        decrypted_string = decrypt_string(encrypted_string, key)
     """
     if not CRYPTO_AVAILABLE:
         raise RuntimeError("cryptography library is not installed.")
-    f = Fernet(key)
+    f = Fernet(key) # type: ignore
     try:
         decrypted = f.decrypt(ciphertext.encode("utf-8"))
         return decrypted.decode("utf-8")

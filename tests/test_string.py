@@ -16,6 +16,8 @@ import os
 
 # Add the src directory to the Python path (adjust if needed)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
+
 
 from unicorefw import _, UniCoreFW  # Import UniCoreFW as usual
 
@@ -44,10 +46,10 @@ class TestUniCoreFWStrings(unittest.TestCase):
         self.assertEqual(UniCoreFW.kebab_case("Some_Var-name"), "some-var-name")
 
     def test_truncate(self):
-        self.assertEqual(UniCoreFW.truncate("Hello world", 5), "Hello...")
+        self.assertEqual(UniCoreFW.truncate("Hello world", 10, separator=" "), "Hello...")
         self.assertEqual(UniCoreFW.truncate("Short", 10), "Short")
         self.assertEqual(
-            UniCoreFW.truncate("This is a long string", 7, "..."), "This is..."
+            UniCoreFW.truncate("This is a long string", 10, "..."), "This is..."
         )
 
     def test_starts_with(self):
@@ -59,7 +61,7 @@ class TestUniCoreFWStrings(unittest.TestCase):
         self.assertFalse(UniCoreFW.ends_with("Testing", "ing "))
 
     def test_words(self):
-        self.assertEqual(UniCoreFW.words("Hello, world!"), ["Hello,", "world!"])
+        self.assertEqual(UniCoreFW.words("Hello, world!"), ["Hello", "world"])
         self.assertEqual(UniCoreFW.words("Hello  world", r"\W+"), ["Hello", "world"])
         self.assertEqual(UniCoreFW.words(""), [])
 

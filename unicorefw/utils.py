@@ -1,22 +1,24 @@
 """
+File: unicorefw/utils.py
 General utility functions for UniCoreFW.
 
 This module contains miscellaneous utility functions that don't fit into other categories.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
+
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 import time
 import random as random_module
-from typing import Any, Callable, List, TypeVar, Union, Optional, Dict, TYPE_CHECKING
-
-# Use TYPE_CHECKING to avoid circular imports
-if TYPE_CHECKING:
-    from .core import UniCoreFWWrapper
+from typing import Any, Callable, List, TypeVar, Optional
 
 T = TypeVar("T")
 U = TypeVar("U")
-
 
 def identity(value: T) -> T:
     """
@@ -27,6 +29,10 @@ def identity(value: T) -> T:
 
     Returns:
         The same value that was passed in
+
+    Examples:
+        >>> identity(42)
+        42
     """
     return value
 
@@ -41,6 +47,10 @@ def times(n: int, func: Callable[[int], T]) -> List[T]:
 
     Returns:
         A list of the results
+    
+    Examples:
+        >>> times(3, lambda x: x * x)
+        [0, 1, 4]
     """
     return [func(i) for i in range(n)]
 
@@ -56,6 +66,12 @@ def unique_id(prefix: str = "") -> str:
 
     Returns:
         A unique string identifier
+
+    Examples:
+        >>> unique_id("user-")
+        "user-1"
+        >>> unique_id("user-")
+        "user-2"
     """
     # This is a module-level function, so we need to access the class variable directly
     # from the UniCoreFW class. This will be properly imported and resolved at runtime.
@@ -63,27 +79,6 @@ def unique_id(prefix: str = "") -> str:
 
     UniCoreFW._id_counter += 1
     return f"{prefix}{UniCoreFW._id_counter}"
-
-
-def escape(string: str) -> str:
-    """
-    Escape HTML characters in a string.
-
-    Args:
-        string: The string to escape
-
-    Returns:
-        An HTML-escaped string
-    """
-    escape_map = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#x27;",
-        "`": "&#x60;",
-    }
-    return "".join(escape_map.get(c, c) for c in string)
 
 
 def mixin(obj):
@@ -95,6 +90,11 @@ def mixin(obj):
 
     Args:
         obj: An object with properties to add to UniCoreFW
+    
+    Examples:
+        >>> mixin({"triple": lambda x: x * 3, "quadruple": lambda x: x * 4})
+        >>> print(UniCoreFW.triple(3))  # Output: 9
+        >>> print(UniCoreFW.quadruple(2))  # Output: 8
     """
     from .core import UniCoreFW
 
@@ -103,28 +103,6 @@ def mixin(obj):
             setattr(UniCoreFW, key, func)
 
 
-def unescape(string: str) -> str:
-    """
-    Unescape HTML characters in a string.
-
-    Args:
-        string: The string to unescape
-
-    Returns:
-        An unescaped string
-    """
-    unescape_map = {
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#x27;": "'",
-        "&#x60;": "`",
-    }
-    for key, value in unescape_map.items():
-        string = string.replace(key, value)
-    return string
-
 
 def now() -> int:
     """
@@ -132,6 +110,10 @@ def now() -> int:
 
     Returns:
         The current time as milliseconds since epoch
+    
+    Examples:
+        >>> now()
+        1680000000000
     """
     return int(time.time() * 1000)
 
@@ -145,6 +127,10 @@ def memoize(func: Callable) -> Callable:
 
     Returns:
         A memoized version of the function
+
+    Examples:
+        >>> memoize(lambda x: x * 2)(5)
+        10
     """
     cache = {}
 
@@ -166,6 +152,10 @@ def random(min_val: int, max_val: int) -> int:
 
     Returns:
         A random integer
+    
+    Examples:
+        >>> random(1, 10)
+        5
     """
     return random_module.randint(min_val, max_val)
 
@@ -180,6 +170,10 @@ def tap(value: T, func: Callable[[T], Any]) -> T:
 
     Returns:
         The original value
+
+    Examples:
+        >>> tap(42, print)
+        42
     """
     func(value)
     return value
@@ -194,6 +188,10 @@ def constant(value: T) -> Callable[[], T]:
 
     Returns:
         A function that always returns the value
+
+    Examples:
+        >>> constant(42)
+        42
     """
     return lambda: value
 
@@ -203,6 +201,10 @@ def noop() -> None:
     A function that does nothing (no operation).
 
     Returns:
+        None
+
+    Examples:
+        >>> noop()
         None
     """
     pass
@@ -221,22 +223,30 @@ def compress(word: str) -> str:
 
     Returns:
         A compressed version of the input string
+
+    Examples:
+        >>> compress("aaabbbccc")
+        '3a3b3c'
     """
     if not word:
         return ""
+
     comp = []  # Use a list for faster concatenation
     length = len(word)
     i = 0
+
     while i < length:
         count = 1
         # Count up to 9 consecutive characters
         while i + count < length and word[i] == word[i + count] and count < 9:
             count += 1
+
         # Append the count and character to comp
         comp.append(f"{count}{word[i]}")
 
         # Move to the next distinct character
         i += count
+
     return "".join(comp)  # Join the list into a single string at the end
 
 
@@ -249,19 +259,28 @@ def decompress(comp: str) -> str:
 
     Returns:
         The decompressed string
+    
+    Examples:
+        decompress("2a3b4c") -> "aaabbbccc"
     """
     result = []
     i = 0
+
     while i < len(comp):
+        # Extract the number (count of characters)
         count = 0
         while i < len(comp) and comp[i].isdigit():
-            count = count * 10 + int(comp[i])
+            count = count * 10 + int(comp[i])  # Handle multi-digit counts
             i += 1
+
+        # Extract the character
         if i < len(comp):
             char = comp[i]
-            result.append(char * count)
+            result.append(char * count)  # Append repeated character
             i += 1
-    return ''.join(result)
+
+    return "".join(result)
+
 
 def max_value(
     array: List[T], key_func: Optional[Callable[[T], Any]] = None
@@ -275,12 +294,16 @@ def max_value(
 
     Returns:
         The maximum value or None if array is empty
+    
+    Examples:
+        >>> max_value([1, 2, 3], key=lambda x: -x)
+        1
     """
     if not array:
         return None
     if key_func:
         return max(array, key=key_func)
-    return max(array)
+    return max(array) # type: ignore
 
 
 def min_value(
@@ -295,12 +318,16 @@ def min_value(
 
     Returns:
         The minimum value or None if array is empty
+
+    Examples:
+        >>> min_value([1, 2, 3], key=lambda x: -x)
+        3
     """
     if not array:
         return None
     if key_func:
         return min(array, key=key_func)
-    return min(array)
+    return min(array) # type: ignore
 
 
 def some(array: List[T], func: Callable[[T], bool]) -> bool:
@@ -313,6 +340,10 @@ def some(array: List[T], func: Callable[[T], bool]) -> bool:
 
     Returns:
         True if any element matches, False otherwise
+
+    Examples:
+        >>> some([1, 2, 3], lambda x: x > 0)
+        True
     """
     return any(func(x) for x in array)
 
@@ -327,6 +358,10 @@ def every(array: List[T], func: Callable[[T], bool]) -> bool:
 
     Returns:
         True if all elements match, False otherwise
+    
+    Examples:
+        >>> every([1, 2, 3], lambda x: x > 0)
+        True
     """
     return all(func(x) for x in array)
 
@@ -340,6 +375,10 @@ def chain(obj: Any) -> Any:
 
     Returns:
         A chainable wrapper
+
+    Examples:
+        >>> chain({"a": 1, "b": 2})["a"]
+        1
     """
     # Import locally to avoid circular imports
     from .core import UniCoreFWWrapper

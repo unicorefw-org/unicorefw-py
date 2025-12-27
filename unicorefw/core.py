@@ -1,10 +1,17 @@
 """
+File: unicorefw/core.py
 Core classes for UniCoreFW - The Universal Core Utility Library.
 
 This module contains the main UniCoreFW class and UniCoreFWWrapper which provide
 the foundation for the library's functionality.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
+
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 # import threading
@@ -24,6 +31,17 @@ from . import types
 from . import security
 from . import template
 
+_MODULES_IN_ORDER = [
+    array,
+    object,
+    string,
+    crypto,
+    function,
+    utils,
+    types,
+    security,
+    template
+]
 
 class UniCoreFW:
     """
@@ -32,7 +50,11 @@ class UniCoreFW:
     This class serves as the primary access point for all UniCoreFW utility functions.
     It can be used directly via static methods or by creating an instance with a collection.
     """
-
+    _name = "UniCoreFW"
+    _author = "Kenny Ngo"
+    _email = "kenny@unicorefw.org"
+    _description = "Universal Core Utility Library"
+    _version = "1.1.0"
     _id_counter = 0  # Initialize the counter
 
     def __init__(self, collection):
@@ -42,10 +64,6 @@ class UniCoreFW:
         Args:
             collection: The collection to wrap with UniCoreFWWrapper
         """
-        self._version = "1.0.6"
-        self._name = "UniCoreFW"
-        self._author = "Kenny Ngo"
-        self._description = "Universal Core Utility Library"
         self.wrapper = UniCoreFWWrapper(collection)
 
     def __getattr__(self, item):
@@ -67,6 +85,7 @@ class UniCoreFW:
         elif hasattr(UniCoreFW, item):
             return getattr(UniCoreFW, item)
         raise AttributeError(f"'UniCoreFW' object has no attribute '{item}'")
+    
 
     def __call__(self, collection):
         """
@@ -94,7 +113,13 @@ class UniCoreFW:
         """
         return cls(collection)
 
+    @staticmethod
+    def _create_wrapper_method(func_name):
+        def wrapper_method(self, *args, **kwargs):
+            return self._apply_unicore_function(func_name, *args, **kwargs)
 
+        return wrapper_method
+    
 class UniCoreFWWrapper:
     """
     Wrapper class that provides method chaining for collections.
@@ -130,7 +155,7 @@ class UniCoreFWWrapper:
         """
         # First check if the function exists in any of the modules
         func = None
-        for module in [array, object, string, crypto, function, utils, types, security, template]:
+        for module in _MODULES_IN_ORDER:
             if hasattr(module, function_name):
                 func = getattr(module, function_name)
                 break
@@ -153,7 +178,7 @@ class UniCoreFWWrapper:
 
         # Function not found
         raise AttributeError(
-            f"'unicore' and Python do not have a callable function named '{function_name}'"
+            f"'unicorefw' and Python do not have a callable function named '{function_name}'"
         )
 
     def value(self):
@@ -180,15 +205,11 @@ setattr(UniCoreFW, "max", staticmethod(utils.max_value))
 setattr(UniCoreFW, "min", staticmethod(utils.min_value))
 
 # Attach all functions from modules to UniCoreFW as static methods
-for module in [array, object, string, crypto, function, utils, types, security, template]:
+for module in _MODULES_IN_ORDER:
     for name, func in inspect.getmembers(module, inspect.isfunction):
-        if not name.startswith('_'):
-            setattr(UniCoreFW, name, staticmethod(func))
-            def create_wrapper_method(func_name):
-                def wrapper_method(self, *args, **kwargs):
-                    return self._apply_unicore_function(func_name, *args, **kwargs)
-
-                return wrapper_method
-
-            wrapper_method = create_wrapper_method(name)
+        if not name.startswith("_"):
+            wrapper_method = UniCoreFW._create_wrapper_method(name)
             setattr(UniCoreFWWrapper, name, wrapper_method)
+            # 👇 prevent later modules from overriding earlier ones
+            if not hasattr(UniCoreFW, name):
+                setattr(UniCoreFW, name, staticmethod(func))

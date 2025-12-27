@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="unicorefw",
-    version="1.0.5",
+    version="1.1.0",
     author="Kenny Ngo",
     author_email="kenny@unicorefw.org",
     description="Universal Core Utility Library",
@@ -18,7 +18,7 @@ setup(
     url="https://github.com/unicorefw-org/unicorefw-py",
     project_urls={
         "Bug Tracker": "https://github.com/unicorefw-org/unicorefw-py/issues",
-        "Documentation": "https://unicorefw.org/docs.html",
+        "Documentation": "https://unicorefw.org",
     },
     classifiers=[
         "Programming Language :: Python :: 3",

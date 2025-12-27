@@ -1,15 +1,21 @@
 """
+File: unicorefw/template.py
 Template engine for UniCoreFW.
 
 This module provides functionality for template processing with variable interpolation
 and basic conditional logic.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
+
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 import re
-from typing import Dict, Any, Match, List
-
+from typing import Dict, Any, List
 from .security import SecurityError, sanitize_string
 
 
@@ -30,6 +36,10 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
     Raises:
         ValueError: If the template contains invalid syntax
         SecurityError: If potentially dangerous patterns are detected
+    
+    Examples:
+        >>> template("Hello, <%= name %>!", {"name": "John"})
+        "Hello, John!"
     """
     # Validate inputs for security
     template_str = sanitize_string(template_str, max_length=10000)
@@ -141,7 +151,8 @@ def template(template_str: str, context: Dict[str, Any]) -> str:
         safe_methods = {"upper", "lower", "title", "capitalize"}
         if isinstance(obj, str) and method_name in safe_methods:
             method = getattr(obj, method_name, None)
-            return method()
+            if method is not None:
+                return method()
         else:
             raise ValueError(
                 f"Method '{method_name}' is not allowed on object of type '{type(obj).__name__}'."

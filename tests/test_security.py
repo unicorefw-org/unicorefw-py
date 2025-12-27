@@ -6,6 +6,8 @@ import os
 import time
 import tempfile
 
+
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from unicorefw import (
     RateLimiter,
@@ -18,6 +20,7 @@ from unicorefw import (
     sanitize_string,
     AuditLogger,
 )
+
 
 
 class TestSecurity(unittest.TestCase):

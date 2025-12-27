@@ -5,10 +5,13 @@ UniCoreFW - Universal Core Utility Library
 A comprehensive suite of utility functions for Python applications.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
-"""
 
-__version__ = "1.0.6"
-__author__ = "Kenny Ngo"
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
+"""
 
 # Import the main classes
 from .core import UniCoreFW, UniCoreFWWrapper
@@ -23,6 +26,12 @@ from .security import *
 from .string import *
 from .crypto import *
 from .template import *
+
+__name__    = UniCoreFW._name
+__version__ = UniCoreFW._version
+__author__  = UniCoreFW._author
+__email__   = UniCoreFW._email
+
 
 # Create a convenience factory function for UniCoreFWWrapper
 def _(collection):
