@@ -33,15 +33,18 @@ jobs:
         
     - name: Perform tests
       run: |
-        pytest tests/test_array*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_array.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_array_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
 
     - name: Test object functions
       run: |
-        pytest tests/test_object*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_object.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_object_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
         
     - name: Test function functions
       run: |
-        pytest tests/test_function*.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_function.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+        pytest tests/test_function_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
 
     - name: Test utility functions
       run: |
