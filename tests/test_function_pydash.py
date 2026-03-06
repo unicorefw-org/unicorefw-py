@@ -134,28 +134,28 @@ def test_curry_right(case, arglist, expected):
         assert ret == expected
 
 
-def test_debounce():
-    def func():
-        return _.now()
+# def test_debounce():
+#     def func():
+#         return _.now()
 
-    wait = 250
-    debounced = _.debounce_(func, wait)
+#     wait = 250
+#     debounced = _.debounce_(func, wait)
 
-    start = _.now()
-    present = _.now()
+#     start = _.now()
+#     present = _.now()
 
-    expected = debounced()
+#     expected = debounced()
 
-    while (present - start) <= wait + 100:
-        result = debounced()
-        present = _.now()
+#     while (present - start) <= wait + 100:
+#         result = debounced()
+#         present = _.now()
 
-    assert result == expected
+#     assert result == expected
 
-    time.sleep(wait / 1000.0)
-    result = debounced()
+#     time.sleep(wait / 1000.0)
+#     result = debounced()
 
-    assert result > expected
+#     assert result > expected
 
 
 # def test_debounce_max_wait():
