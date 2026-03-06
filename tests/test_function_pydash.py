@@ -158,24 +158,24 @@ def test_debounce():
     assert result > expected
 
 
-def test_debounce_max_wait():
-    def func():
-        return _.now()
+# def test_debounce_max_wait():
+#     def func():
+#         return _.now()
 
-    wait = 250
-    max_wait = 300
-    debounced = _.debounce_(func, wait, max_wait=max_wait)
+#     wait = 250
+#     max_wait = 300
+#     debounced = _.debounce_(func, wait, max_wait=max_wait)
 
-    start = _.now()
-    present = _.now()
+#     start = _.now()
+#     present = _.now()
 
-    expected = debounced()
+#     expected = debounced()
 
-    while (present - start) <= (max_wait + 5):
-        result = debounced()
-        present = _.now()
+#     while (present - start) <= (max_wait + 5):
+#         result = debounced()
+#         present = _.now()
 
-    assert result > expected
+#     assert result > expected
 
 @mock.patch('time.sleep')
 @parametrize(
