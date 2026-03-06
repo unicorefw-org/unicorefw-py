@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 ##############################################################################
-# /tests/function_functions_tests.py - Tests for Unicore functions           #
+# /tests/test_function.py - Tests for Unicore functions                     #
 # Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.Info                #
 #                                                                            #
 # This file is part of UniCoreFW. You can redistribute it and/or modify      #
@@ -18,20 +18,19 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
-from unicorefw import UniCoreFW  # Now you can import Unicore as usual
-
+from unicorefw import _
 
 class TestUniCoreFWFunctions(unittest.TestCase):
     def test_matches(self):
         # matches(attrs) returns a function that checks if an object has those attrs
-        checker = UniCoreFW.matches({"a": 1, "b": 2})
+        checker = _.matches({"a": 1, "b": 2})
         self.assertTrue(checker({"a": 1, "b": 2, "c": 3}))
         self.assertFalse(checker({"a": 1, "b": 9}))
         self.assertFalse(checker({"a": 1}))
 
     def test_property_func(self):
         # property_func("someKey") => returns a function that fetches obj["someKey"] or obj.someKey
-        get_name = UniCoreFW.property_func("name")
+        get_name = _.property_func("name")
         self.assertEqual(get_name({"name": "Alice"}), "Alice")
 
         # Non-dict fallback
@@ -51,7 +50,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def record_call():
             calls.append("called")
 
-        after_func = UniCoreFW.after(3, record_call)
+        after_func = _.after(3, record_call)
         after_func()
         after_func()
         after_func()
@@ -61,7 +60,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def adder(x, y):
             return x + y
 
-        before_func = UniCoreFW.before(3, adder)
+        before_func = _.before(3, adder)
         self.assertEqual(before_func(1, 2), 3, "Before should allow execution")
 
     def test_bind_all(self):
@@ -73,14 +72,14 @@ class TestUniCoreFWFunctions(unittest.TestCase):
                 return self.value
 
         obj = MyClass(10)
-        UniCoreFW.bind_all(obj, "get_value")
+        _.bind_all(obj, "get_value")
         self.assertEqual(obj.get_value(), 10)
 
     def test_bind(self):
         def greet(greeting, name):
             return f"{greeting}, {name}!"
 
-        bound_func = UniCoreFW.bind(greet, None, "Hello")
+        bound_func = _.bind(greet, None, "Hello")
         self.assertEqual(
             bound_func("Alice"),
             "Hello, Alice!",
@@ -94,7 +93,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def times2(x):
             return x * 2
 
-        composed = UniCoreFW.compose(add1, times2)
+        composed = _.compose(add1, times2)
         self.assertEqual(
             composed(3), 7, "Compose should apply functions from right to left"
         )
@@ -107,7 +106,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def record_call():
             calls.append(time.time())
 
-        debounced = UniCoreFW.debounce(record_call, 0.1)
+        debounced = _.debounce(record_call, 0.1)
         debounced()
         time.sleep(0.2)
         debounced()
@@ -121,7 +120,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def append_to_output():
             output.append("deferred")
 
-        UniCoreFW.defer(append_to_output)
+        _.defer(append_to_output)
         # Give a small delay to allow defer to execute in background
         import time
 
@@ -138,7 +137,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def record_call():
             calls.append("called")
 
-        UniCoreFW.delay(record_call, 0.1)
+        _.delay(record_call, 0.1)
         time.sleep(0.2)
         self.assertEqual(
             calls, ["called"], "Should delay the execution of the function"
@@ -148,7 +147,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def factorial(n):
             return n * factorial(n - 1) if n > 1 else 1
 
-        memoized_factorial = UniCoreFW.memoize(factorial)
+        memoized_factorial = _.memoize(factorial)
         self.assertEqual(memoized_factorial(5), 120)
         self.assertEqual(memoized_factorial(5), 120)  # Should hit the cache
 
@@ -156,14 +155,14 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def is_even(x):
             return x % 2 == 0
 
-        is_odd = UniCoreFW.negate(is_even)
+        is_odd = _.negate(is_even)
         self.assertTrue(
             is_odd(3),
             "Negate should return the opposite of the original function result",
         )
 
     def test_once(self):
-        func = UniCoreFW.once(lambda: "called")
+        func = _.once(lambda: "called")
         result = func()
         self.assertEqual(result, "called")
         # self.assertIsNone(func())
@@ -172,7 +171,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def multiply(x, y):
             return x * y
 
-        partial_func = UniCoreFW.partial(multiply, 5)
+        partial_func = _.partial(multiply, 5)
         self.assertEqual(
             partial_func(2), 10, "Should partially apply the first argument"
         )
@@ -185,7 +184,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def record_call():
             calls.append(time.time())
 
-        throttled = UniCoreFW.throttle(record_call, 0.1)
+        throttled = _.throttle(record_call, 0.1)
         throttled()
         throttled()
         self.assertEqual(
@@ -198,7 +197,7 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         def greet(name):
             return f"Hello, {name}!"
 
-        wrapped_greet = UniCoreFW.wrap(greet, lambda f, name: f(name).upper())
+        wrapped_greet = _.wrap(greet, lambda f, name: f(name).upper())
         self.assertEqual(wrapped_greet("world"), "HELLO, WORLD!")
 
 

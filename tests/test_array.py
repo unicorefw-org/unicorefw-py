@@ -15,124 +15,124 @@ import os
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from unicorefw import UniCoreFW  # Now you can import Unicore as usual
+from unicorefw import _  # Now you can import Unicore as usual
 sys.dont_write_bytecode = True
 
 
 class TestUnicoreArrays(unittest.TestCase):
     # ------- Array and Collection Functions ------- #
     def test_chunk(self):
-        result = UniCoreFW.chunk([1, 2, 3, 4, 5], 2)
+        result = _.chunk([1, 2, 3, 4, 5], 2)
         self.assertEqual(result, [[1, 2], [3, 4], [5]])
 
     def test_compact(self):
         arr = [0, 1, False, 2, "", 3]
         self.assertEqual(
-            UniCoreFW.compact(arr), [1, 2, 3], "Should remove falsy values from array"
+            _.compact(arr), [1, 2, 3], "Should remove falsy values from array"
         )
 
     def test_contains(self):
-        self.assertTrue(UniCoreFW.contains([1, 2, 3], 2))
-        self.assertFalse(UniCoreFW.contains([1, 2, 3], 4))
+        self.assertTrue(_.contains([1, 2, 3], 2))
+        self.assertFalse(_.contains([1, 2, 3], 4))
 
     def test_count_by(self):
         arr = [1, 2, 3, 4, 5]
-        result = UniCoreFW.count_by(arr, lambda x: x % 2 == 0)
+        result = _.count_by(arr, lambda x: x % 2 == 0)
         self.assertEqual(
             result, {False: 3, True: 2}, "Should count elements by the given condition"
         )
 
     def test_difference(self):
-        result = UniCoreFW.difference([1, 2, 3, 4], [2, 4])
+        result = _.difference([1, 2, 3, 4], [2, 4])
         self.assertEqual(result, [1, 3])
 
     def test_every(self):
         arr = [2, 4, 6]
         self.assertTrue(
-            UniCoreFW.every(arr, lambda x: x % 2 == 0),
+            _.every(arr, lambda x: x % 2 == 0),
             "Should return True when all elements satisfy the condition",
         )
         arr = [2, 3, 6]
         self.assertFalse(
-            UniCoreFW.every(arr, lambda x: x % 2 == 0),
+            _.every(arr, lambda x: x % 2 == 0),
             "Should return False when not all elements satisfy the condition",
         )
 
     def test_filter(self):
-        result = UniCoreFW.filter([1, 2, 3, 4], lambda x: x % 2 == 0)
+        result = _.filter([1, 2, 3, 4], lambda x: x % 2 == 0)
         self.assertEqual(result, [2, 4])
 
     def test_find_median_sorted_arrays(self):
         self.assertEqual(
-            UniCoreFW.find_median_sorted_arrays([1, 3], [2]),
+            _.find_median_sorted_arrays([1, 3], [2]),
             2.0,
             "Should return the median of the merged sorted arrays",
         )
         self.assertEqual(
-            UniCoreFW.find_median_sorted_arrays([1, 2], [3, 4]),
+            _.find_median_sorted_arrays([1, 2], [3, 4]),
             2.5,
             "Should return the median of the merged sorted arrays",
         )
 
     def test_first(self):
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3]), 1, "can pull out the first element of an array"
+            _.first([1, 2, 3]), 1, "can pull out the first element of an array"
         )
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3]), 1, 'can perform OO-style "first()"'
+            _.first([1, 2, 3]), 1, 'can perform OO-style "first()"'
         )
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3], 0),
+            _.first([1, 2, 3], 0),
             [],
             "returns an empty array when n <= 0 (0 case)",
         )
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3], -1),
+            _.first([1, 2, 3], -1),
             [],
             "returns an empty array when n <= 0 (negative case)",
         )
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3], 2), [1, 2], "can fetch the first n elements"
+            _.first([1, 2, 3], 2), [1, 2], "can fetch the first n elements"
         )
         self.assertEqual(
-            UniCoreFW.first([1, 2, 3], 5),
+            _.first([1, 2, 3], 5),
             [1, 2, 3],
             "returns the whole array if n > length",
         )
-        result = (lambda: UniCoreFW.first(4, 3, 2, 1))()
+        result = (lambda: _.first(4, 3, 2, 1))()
         self.assertEqual(result, 4, "works on an arguments object")
-        result = UniCoreFW.map([[1, 2, 3], [], [1, 2, 3]], lambda x: UniCoreFW.first(x))
-        self.assertEqual(list(result), [1, None, 1], "works well with UniCoreFW.map")
+        result = _.map([[1, 2, 3], [], [1, 2, 3]], lambda x: _.first(x))
+        self.assertEqual(list(result), [1, None, 1], "works well with _.map")
         self.assertEqual(
-            UniCoreFW.first(None), None, "returns undefined when called on null"
+            _.first(None), None, "returns undefined when called on null"
         )
         self.assertEqual(
-            UniCoreFW.first([], 10),
+            _.first([], 10),
             [],
             "returns an empty array when called with an explicit number of elements to return",
         )
         self.assertEqual(
-            UniCoreFW.first([], 1),
+            _.first([], 1),
             [],
             "returns an empty array when called with an explicit number of elements to return",
         )
         self.assertEqual(
-            UniCoreFW.first(None, 5),
+            _.first(None, 5),
             [],
             "returns an empty array when called with an explicit number of elements to return",
         )
         self.assertEqual(
-            UniCoreFW.first([]), None, "return undefined when called on a empty array"
+            _.first([]), None, "return undefined when called on a empty array"
         )
 
     def test_find(self):
         arr = [1, 2, 3, 4]
         # Should find the first element matching x > 2
-        found = UniCoreFW.find(arr, lambda x: x > 2)
+        found = _.find(arr, lambda x: x > 2)
         self.assertEqual(found, 3)
 
         # Should return None if no match
-        not_found = UniCoreFW.find(arr, lambda x: x > 10)
+        not_found = _.find(arr, lambda x: x > 10)
         self.assertIsNone(not_found)
 
         # Test exception-safety (func that might raise)
@@ -142,96 +142,96 @@ class TestUnicoreArrays(unittest.TestCase):
             return False
 
         # Should skip elements that cause exceptions
-        found_exception = UniCoreFW.find(arr, raiser)
+        found_exception = _.find(arr, raiser)
         self.assertIsNone(found_exception)
 
     def test_last(self):
         # Single list argument
-        self.assertEqual(UniCoreFW.last([1, 2, 3]), 3, "Should return the last element")
+        self.assertEqual(_.last([1, 2, 3]), 3, "Should return the last element")
 
         # last n elements
-        self.assertEqual(UniCoreFW.last([1, 2, 3, 4], n=2), [3, 4])
+        self.assertEqual(_.last([1, 2, 3, 4], n=2), [3, 4])
 
         # Edge cases
-        self.assertIsNone(UniCoreFW.last([]), "Empty list => None")
+        self.assertIsNone(_.last([]), "Empty list => None")
         self.assertEqual(
-            UniCoreFW.last([], n=3), [], "Empty list => empty list when n specified"
+            _.last([], n=3), [], "Empty list => empty list when n specified"
         )
 
         # Multiple args scenario
         self.assertEqual(
-            UniCoreFW.last(5, 6, 7),
+            _.last(5, 6, 7),
             7,
             "If called like last(5,6,7) => returns the last argument",
         )
 
     def test_uniq(self):
         arr = [1, 2, 2, 3, 1, 4]
-        uniq_arr = UniCoreFW.uniq(arr)
+        uniq_arr = _.uniq(arr)
         # Because set-based deduplication is not guaranteed to preserve order,
         # the function returns a list but order may vary. Let's check content:
         self.assertEqual(set(uniq_arr), {1, 2, 3, 4})
         self.assertEqual(len(uniq_arr), 4, "Should remove duplicates")
 
         # Edge case: empty array
-        self.assertEqual(UniCoreFW.uniq([]), [])
+        self.assertEqual(_.uniq([]), [])
 
     def test_flatten(self):
-        result = UniCoreFW.flatten([1, [2, [3, 4]], 5], 2)
+        result = _.flatten([1, [2, [3, 4]], 5], 2)
         self.assertEqual(result, [1, 2, 3, 4, 5])
-        self.assertEqual(UniCoreFW.flatten([[], [[]], []]), [], "supports empty arrays")
+        self.assertEqual(_.flatten([[], [[]], []]), [], "supports empty arrays")
         self.assertEqual(
-            UniCoreFW.flatten([[], [[]], []], True),
+            _.flatten([[], [[]], []], True),
             [[]],
             "can shallowly flatten empty arrays",
         )
         list_ = [1, [2], [3, [[[4]]]]]
         self.assertEqual(
-            UniCoreFW.flatten(list_), [1, 2, 3, 4], "can flatten nested arrays"
+            _.flatten(list_), [1, 2, 3, 4], "can flatten nested arrays"
         )
         self.assertEqual(
-            UniCoreFW.flatten(list_, True),
+            _.flatten(list_, True),
             [1, 2, 3, [[[4]]]],
             "can shallowly flatten nested arrays",
         )
         list_ = [[1], [2], [3], [[4]]]
         self.assertEqual(
-            UniCoreFW.flatten(list_, True),
+            _.flatten(list_, True),
             [1, 2, 3, [4]],
             "can shallowly flatten arrays containing only other arrays",
         )
         list_ = [1, [2], [[3]], [[[4]]]]
         self.assertEqual(
-            UniCoreFW.flatten(list_, 2),
+            _.flatten(list_, 2),
             [1, 2, 3, [4]],
             "can flatten arrays to a given depth",
         )
         self.assertEqual(
-            UniCoreFW.flatten(list_, 0), list_, "can flatten arrays to depth of 0"
+            _.flatten(list_, 0), list_, "can flatten arrays to depth of 0"
         )
-        # self.assertEqual(UniCoreFW.flatten(list_, False), [1, 2, 3, 4], 'false means deep')
-        # result = (lambda: UniCoreFW.flatten(1, [2], [3, [[[4]]]]))()
+        # self.assertEqual(_.flatten(list_, False), [1, 2, 3, 4], 'false means deep')
+        # result = (lambda: _.flatten(1, [2], [3, [[[4]]]]))()
         # self.assertEqual(result, [1, 2, 3, 4], 'works on an arguments object')
-        # self.assertEqual(UniCoreFW.flatten(None), [], 'supports null')
-        # self.assertEqual(UniCoreFW.flatten(None), [], 'supports undefined')
-        # self.assertEqual(UniCoreFW.flatten(list_, -1), list_, 'can flatten arrays to depth of -1')
-        # self.assertEqual(len(UniCoreFW.flatten([range(10), range(10), 5, 1, 3], True)), 23, 'can flatten medium length arrays')
-        # self.assertEqual(len(UniCoreFW.flatten([range(10), range(10), 5, 1, 3])), 23, 'can shallowly flatten medium length arrays')
-        # self.assertEqual(len(UniCoreFW.flatten([[None] * 1000000, range(56000), 5, 1, 3])), 1056003, 'can handle massive arrays')
-        # self.assertEqual(len(UniCoreFW.flatten([[None] * 1000000, range(56000), 5, 1, 3], True)), 1056003, 'can handle massive arrays in shallow mode')
+        # self.assertEqual(_.flatten(None), [], 'supports null')
+        # self.assertEqual(_.flatten(None), [], 'supports undefined')
+        # self.assertEqual(_.flatten(list_, -1), list_, 'can flatten arrays to depth of -1')
+        # self.assertEqual(len(_.flatten([range(10), range(10), 5, 1, 3], True)), 23, 'can flatten medium length arrays')
+        # self.assertEqual(len(_.flatten([range(10), range(10), 5, 1, 3])), 23, 'can shallowly flatten medium length arrays')
+        # self.assertEqual(len(_.flatten([[None] * 1000000, range(56000), 5, 1, 3])), 1056003, 'can handle massive arrays')
+        # self.assertEqual(len(_.flatten([[None] * 1000000, range(56000), 5, 1, 3], True)), 1056003, 'can handle massive arrays in shallow mode')
         x = range(100000)
         for i in range(1000):
             x = [x]
-        # self.assertEqual(UniCoreFW.flatten(x), range(100000), 'can handle very deep arrays')
+        # self.assertEqual(_.flatten(x), range(100000), 'can handle very deep arrays')
         self.assertEqual(
-            UniCoreFW.flatten(x, True),
+            _.flatten(x, True),
             x[0],
             "can handle very deep arrays in shallow mode",
         )
 
     def test_group_by(self):
         arr = [1, 2, 3, 4]
-        result = UniCoreFW.group_by(arr, lambda x: x % 2)
+        result = _.group_by(arr, lambda x: x % 2)
         self.assertEqual(
             result,
             {1: [1, 3], 0: [2, 4]},
@@ -240,7 +240,7 @@ class TestUnicoreArrays(unittest.TestCase):
 
     def test_index_by(self):
         arr = [{"id": 1, "value": "a"}, {"id": 2, "value": "b"}]
-        result = UniCoreFW.index_by(arr, "id")
+        result = _.index_by(arr, "id")
         self.assertEqual(
             result,
             {1: {"id": 1, "value": "a"}, 2: {"id": 2, "value": "b"}},
@@ -249,27 +249,27 @@ class TestUnicoreArrays(unittest.TestCase):
 
     def test_initial(self):
         self.assertEqual(
-            UniCoreFW.initial([1, 2, 3, 4, 5]),
+            _.initial([1, 2, 3, 4, 5]),
             [1, 2, 3, 4],
             "returns all but the last element",
         )
         self.assertEqual(
-            UniCoreFW.initial([1, 2, 3, 4], 2),
+            _.initial([1, 2, 3, 4], 2),
             [1, 2],
             "returns all but the last n elements",
         )
         self.assertEqual(
-            UniCoreFW.initial([1, 2, 3, 4], 6),
+            _.initial([1, 2, 3, 4], 6),
             [],
             "returns an empty array when n > length",
         )
-        # result = (lambda: UniCoreFW.initial(1, 2, 3, 4))()
+        # result = (lambda: _.initial(1, 2, 3, 4))()
         # self.assertEqual(result, [1, 2, 3], 'works on an arguments object')
-        # result = map(lambda x: UniCoreFW.initial(x), [[1, 2, 3], [1, 2, 3]])
-        # self.assertEqual(list(UniCoreFW.flatten(result)), [1, 2, 1, 2], 'works well with UniCoreFW.map')
+        # result = map(lambda x: _.initial(x), [[1, 2, 3], [1, 2, 3]])
+        # self.assertEqual(list(_.flatten(result)), [1, 2, 1, 2], 'works well with _.map')
 
     def test_intersection(self):
-        result = UniCoreFW.intersection([1, 2, 3], [2, 3, 4])
+        result = _.intersection([1, 2, 3], [2, 3, 4])
         self.assertEqual(result, [2, 3])
 
     def test_invoke(self):
@@ -279,7 +279,7 @@ class TestUnicoreArrays(unittest.TestCase):
 
         obj = TestClass()
         obj.value = 5
-        result = UniCoreFW.invoke([obj], "double")
+        result = _.invoke([obj], "double")
         self.assertEqual(
             result, [10], "Should invoke the method on each object in the array"
         )
@@ -287,109 +287,109 @@ class TestUnicoreArrays(unittest.TestCase):
     def test_last_index_of(self):
         arr = [1, 2, 3, 2, 1]
         self.assertEqual(
-            UniCoreFW.last_index_of(arr, 2),
+            _.last_index_of(arr, 2),
             3,
             "Should return the last index of the given value",
         )
 
     def test_map_object(self):
-        result = UniCoreFW.map_object({"a": 1, "b": 2}, lambda x: x * 2)
+        result = _.map_object({"a": 1, "b": 2}, lambda x: x * 2)
         self.assertEqual(result, {"a": 2, "b": 4})
 
     def test_max(self):
         arr = [1, 3, 2, 5, 4]
-        self.assertEqual(UniCoreFW.max(arr), 5, "Should return the maximum value")
+        self.assertEqual(_.max(arr), 5, "Should return the maximum value")
 
     def test_min(self):
         arr = [1, 3, 2, 5, 4]
-        self.assertEqual(UniCoreFW.min(arr), 1, "Should return the minimum value")
+        self.assertEqual(_.min(arr), 1, "Should return the minimum value")
 
     def test_object(self):
         keys = ["a", "b", "c"]
         values = [1, 2, 3]
         self.assertEqual(
-            UniCoreFW.object(keys, values),
+            _.object(keys, values),
             {"a": 1, "b": 2, "c": 3},
             "Should create an object from keys and values",
         )
 
     def test_partition(self):
         arr = [1, 2, 3, 4, 5]
-        result = UniCoreFW.partition(arr, lambda x: x % 2 == 0)
+        result = _.partition(arr, lambda x: x % 2 == 0)
         self.assertEqual(
             result, [[2, 4], [1, 3, 5]], "Should partition array based on predicate"
         )
 
     def test_pluck(self):
-        result = UniCoreFW.pluck([{"a": 1}, {"a": 2}], "a")
+        result = _.pluck([{"a": 1}, {"a": 2}], "a")
         self.assertEqual(result, [1, 2])
 
     def test_range(self):
-        self.assertEqual(UniCoreFW.range(5), [0, 1, 2, 3, 4])
-        self.assertEqual(UniCoreFW.range(1, 5), [1, 2, 3, 4])
-        self.assertEqual(UniCoreFW.range(1, 10, 2), [1, 3, 5, 7, 9])
+        self.assertEqual(_.range(5), [0, 1, 2, 3, 4])
+        self.assertEqual(_.range(1, 5), [1, 2, 3, 4])
+        self.assertEqual(_.range(1, 10, 2), [1, 3, 5, 7, 9])
 
     def test_reduce(self):
-        result = UniCoreFW.reduce([1, 2, 3, 4], lambda acc, x: acc + x, 0)
+        result = _.reduce([1, 2, 3, 4], lambda acc, x: acc + x, 0)
         self.assertEqual(result, 10)
 
     def test_reject(self):
         arr = [1, 2, 3, 4]
-        result = UniCoreFW.reject(arr, lambda x: x % 2 == 0)
+        result = _.reject(arr, lambda x: x % 2 == 0)
         self.assertEqual(result, [1, 3], "Should reject elements based on predicate")
 
     def test_rest(self):
-        result = UniCoreFW.rest([1, 2, 3, 4], 2)
+        result = _.rest([1, 2, 3, 4], 2)
         self.assertEqual(result, [3, 4])
         numbers = [1, 2, 3, 4]
         self.assertEqual(
-            UniCoreFW.rest(numbers), [2, 3, 4], "fetches all but the first element"
+            _.rest(numbers), [2, 3, 4], "fetches all but the first element"
         )
         self.assertEqual(
-            UniCoreFW.rest(numbers, 0),
+            _.rest(numbers, 0),
             [1, 2, 3, 4],
             "returns the whole array when index is 0",
         )
         self.assertEqual(
-            UniCoreFW.rest(numbers, 2),
+            _.rest(numbers, 2),
             [3, 4],
             "returns elements starting at the given index",
         )
-        # result = (lambda: UniCoreFW.rest(1, 2, 3, 4))()
+        # result = (lambda: _.rest(1, 2, 3, 4))()
         # self.assertEqual(result, [2, 3, 4], 'works on an arguments object')
-        # result = map(lambda x: UniCoreFW.rest(x), [[1, 2, 3], [1, 2, 3]])
-        # self.assertEqual(list(UniCoreFW.flatten(result)), [2, 3, 2, 3], 'works well with _.map')
+        # result = map(lambda x: _.rest(x), [[1, 2, 3], [1, 2, 3]])
+        # self.assertEqual(list(_.flatten(result)), [2, 3, 2, 3], 'works well with _.map')
 
     def test_sample(self):
         array = [1, 2, 3, 4, 5]
-        sample = UniCoreFW.sample(array, 2)
+        sample = _.sample(array, 2)
         self.assertEqual(len(sample), 2)
         for item in sample:
             self.assertIn(item, array)
 
     def test_shuffle(self):
         array = [1, 2, 3, 4, 5]
-        shuffled = UniCoreFW.shuffle(array)
+        shuffled = _.shuffle(array)
         self.assertCountEqual(shuffled, array)  # Same elements, different order
 
     def test_size(self):
-        self.assertEqual(UniCoreFW.size([1, 2, 3]), 3)
-        self.assertEqual(UniCoreFW.size({"a": 1, "b": 2}), 2)
+        self.assertEqual(_.size([1, 2, 3]), 3)
+        self.assertEqual(_.size({"a": 1, "b": 2}), 2)
 
     def test_some(self):
         arr = [1, 2, 3, 4]
         self.assertTrue(
-            UniCoreFW.some(arr, lambda x: x > 3),
+            _.some(arr, lambda x: x > 3),
             "Should return True if some elements match the condition",
         )
         self.assertFalse(
-            UniCoreFW.some(arr, lambda x: x > 4),
+            _.some(arr, lambda x: x > 4),
             "Should return False if no elements match the condition",
         )
 
     def test_sort_by(self):
         arr = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
-        result = UniCoreFW.sort_by(arr, lambda x: x["age"])
+        result = _.sort_by(arr, lambda x: x["age"])
         self.assertEqual(
             result,
             [{"name": "Bob", "age": 25}, {"name": "Alice", "age": 30}],
@@ -397,29 +397,29 @@ class TestUnicoreArrays(unittest.TestCase):
         )
 
     def test_to_array(self):
-        self.assertEqual(UniCoreFW.to_array((1, 2, 3)), [1, 2, 3])
-        self.assertEqual(UniCoreFW.to_array({"a": 1, "b": 2}), [1, 2])
+        self.assertEqual(_.to_array((1, 2, 3)), [1, 2, 3])
+        self.assertEqual(_.to_array({"a": 1, "b": 2}), [1, 2])
 
     def test_union(self):
-        result = UniCoreFW.union([1, 2], [2, 3])
+        result = _.union([1, 2], [2, 3])
         self.assertEqual(result, [1, 2, 3])
 
     def test_unzip(self):
         arr = [(1, "a"), (2, "b"), (3, "c")]
         self.assertEqual(
-            UniCoreFW.unzip(arr),
+            _.unzip(arr),
             [[1, 2, 3], ["a", "b", "c"]],
             "Should unzip array of tuples",
         )
 
     def test_where(self):
-        result = UniCoreFW.where([{"a": 1}, {"a": 2}, {"a": 1}], {"a": 1})
+        result = _.where([{"a": 1}, {"a": 2}, {"a": 1}], {"a": 1})
         self.assertEqual(result, [{"a": 1}, {"a": 1}])
 
     def test_without(self):
         arr = [1, 2, 3, 4]
         self.assertEqual(
-            UniCoreFW.without(arr, 2, 4),
+            _.without(arr, 2, 4),
             [1, 3],
             "Should return array without specified values",
         )
@@ -428,7 +428,7 @@ class TestUnicoreArrays(unittest.TestCase):
         arr1 = [1, 2, 3]
         arr2 = ["a", "b", "c"]
         self.assertEqual(
-            UniCoreFW.zip(arr1, arr2),
+            _.zip(arr1, arr2),
             [(1, "a"), (2, "b"), (3, "c")],
             "Should zip arrays into tuples",
         )

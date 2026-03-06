@@ -26,6 +26,7 @@ from .security import *
 from .string import *
 from .crypto import *
 from .template import *
+from .db import *
 
 __name__    = UniCoreFW._name
 __version__ = UniCoreFW._version

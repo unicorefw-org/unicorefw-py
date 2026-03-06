@@ -1,10 +1,17 @@
 """
+File: unicorefw/db.py
 Database utilities for UniCoreFW.
 
 This module provides comprehensive database functionality including connection management,
 query execution, migrations, import/export, and support for multiple database engines.
 
 Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.info
+
+This file is part of UniCoreFW. You can redistribute it and/or modify
+it under the terms of the [BSD-3-Clause] as published by
+the Free Software Foundation.
+You should have received a copy of the [BSD-3-Clause] license
+along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 import json
@@ -14,45 +21,46 @@ import threading
 import time
 import hashlib
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Type
+import re
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from contextlib import contextmanager
 from datetime import datetime
-from pathlib import Path
+# from pathlib import Path
 
 # Optional imports for additional database support
 try:
-    import psycopg2
-    import psycopg2.extras
+    import psycopg2 # type: ignore
+    import psycopg2.extras # type: ignore
     POSTGRES_AVAILABLE = True
 except ImportError:
     POSTGRES_AVAILABLE = False
 
 try:
-    import pymysql
+    import pymysql # type: ignore
     MYSQL_AVAILABLE = True
 except ImportError:
     MYSQL_AVAILABLE = False
 
 try:
-    import pymongo
+    import pymongo # type: ignore
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
 
 try:
-    import redis
+    import redis # type: ignore
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
 
 try:
-    import pandas as pd
+    import pandas as pd # type: ignore
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
 
 try:
-    import openpyxl
+    import openpyxl # type: ignore  # noqa: F401
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
@@ -81,6 +89,43 @@ class ExportError(DatabaseError):
 class ImportError(DatabaseError):
     """Raised when data import fails."""
     pass
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Security-first SQL identifier handling
+#   - Prevent table/column injection in helper APIs that interpolate identifiers
+#   - Support schema-qualified tables (schema.table)
+#   - Quote identifiers for engines that support it
+# ──────────────────────────────────────────────────────────────────────────────
+
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_ident(name: str) -> None:
+    if not isinstance(name, str) or not _IDENT_RE.match(name):
+        raise DatabaseError(f"Unsafe SQL identifier: {name!r}")
+
+
+def _split_table(table: str) -> List[str]:
+    if not isinstance(table, str) or not table:
+        raise DatabaseError("Table name must be a non-empty string")
+    parts = table.split(".")
+    for p in parts:
+        _validate_ident(p)
+    return parts
+
+
+def _qident(engine: str, ident: str) -> str:
+    _validate_ident(ident)
+    if engine in ("postgres", "sqlite"):
+        return f'"{ident}"'
+    if engine == "mysql":
+        return f"`{ident}`"
+    return ident
+
+
+def _qtable(engine: str, table: str) -> str:
+    return ".".join(_qident(engine, p) for p in _split_table(table))
+
 
 
 class ConnectionPool:
@@ -162,6 +207,7 @@ class Database:
         self._config = kwargs
         self._pool = None
         self._transaction_active = False
+        self._prev_autocommit: Optional[bool] = None
         
         # Initialize based on engine
         if self.engine == "sqlite":
@@ -187,28 +233,31 @@ class Database:
         """Initialize PostgreSQL connection."""
         if not POSTGRES_AVAILABLE:
             raise DatabaseError("psycopg2 is not installed")
-        self.connection = psycopg2.connect(**kwargs)
-        self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        self.connection = psycopg2.connect(**kwargs)  # type: ignore
+        self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)  # type: ignore
+        # Stability: default autocommit ON for Postgres so DDL executed outside an explicit
+        # Database.transaction() isn't accidentally rolled back by a later rollback.
+        self.connection.autocommit = True  # type: ignore[attr-defined]
     
     def _init_mysql(self, **kwargs):
         """Initialize MySQL connection."""
         if not MYSQL_AVAILABLE:
             raise DatabaseError("pymysql is not installed")
-        self.connection = pymysql.connect(**kwargs)
-        self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)
+        self.connection = pymysql.connect(**kwargs)  # type: ignore
+        self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)  # type: ignore
     
     def _init_mongodb(self, **kwargs):
         """Initialize MongoDB connection."""
         if not MONGODB_AVAILABLE:
             raise DatabaseError("pymongo is not installed")
-        client = pymongo.MongoClient(**kwargs)
+        client = pymongo.MongoClient(**kwargs)  # type: ignore
         self.connection = client[kwargs.get("database", "test")]
     
     def _init_redis(self, **kwargs):
         """Initialize Redis connection."""
         if not REDIS_AVAILABLE:
             raise DatabaseError("redis is not installed")
-        self.connection = redis.Redis(**kwargs)
+        self.connection = redis.Redis(**kwargs)  # type: ignore
     
     def close(self):
         """Close database connection."""
@@ -249,19 +298,29 @@ class Database:
         if self.engine in ["sqlite", "postgres", "mysql"]:
             self._transaction_active = True
             if self.engine == "postgres":
-                self.cursor.execute("BEGIN")
+                # Temporarily disable autocommit for the duration of the transaction
+                self._prev_autocommit = getattr(self.connection, "autocommit", None)  # type: ignore[attr-defined]
+                if self._prev_autocommit is True:
+                    self.connection.autocommit = False  # type: ignore[attr-defined]
+                self.cursor.execute("BEGIN")  # type: ignore
     
     def commit(self):
         """Commit the current transaction."""
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            self.connection.commit()
+            self.connection.commit()  # type: ignore
             self._transaction_active = False
+            if self.engine == "postgres" and self._prev_autocommit is True:
+                self.connection.autocommit = True  # type: ignore[attr-defined]
+            self._prev_autocommit = None
     
     def rollback(self):
         """Rollback the current transaction."""
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            self.connection.rollback()
+            self.connection.rollback()  # type: ignore
             self._transaction_active = False
+            if self.engine == "postgres" and self._prev_autocommit is True:
+                self.connection.autocommit = True  # type: ignore[attr-defined]
+            self._prev_autocommit = None
     
     def execute(self, query: str, params: Optional[Tuple] = None) -> Any:
         """
@@ -277,9 +336,9 @@ class Database:
         if self.engine in ["sqlite", "postgres", "mysql"]:
             try:
                 if params:
-                    self.cursor.execute(query, params)
+                    self.cursor.execute(query, params)  # type: ignore
                 else:
-                    self.cursor.execute(query)
+                    self.cursor.execute(query)  # type: ignore
                 return self.cursor
             except Exception as e:
                 raise QueryError(f"Query execution failed: {e}")
@@ -299,9 +358,9 @@ class Database:
         """
         self.execute(query, params)
         if self.engine == "sqlite":
-            return [dict(row) for row in self.cursor.fetchall()]
+            return [dict(row) for row in self.cursor.fetchall()]  # type: ignore
         else:
-            return self.cursor.fetchall()
+            return self.cursor.fetchall()  # type: ignore
     
     def fetch_one(self, query: str, params: Optional[Tuple] = None) -> Optional[Dict]:
         """
@@ -315,7 +374,7 @@ class Database:
             Result dictionary or None
         """
         self.execute(query, params)
-        result = self.cursor.fetchone()
+        result = self.cursor.fetchone()  # type: ignore
         if result and self.engine == "sqlite":
             return dict(result)
         return result
@@ -332,21 +391,43 @@ class Database:
             Last inserted row ID
         """
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            columns = ", ".join(data.keys())
-            placeholders = ", ".join(["?" if self.engine == "sqlite" else "%s" for _ in data])
-            query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
-            
-            self.execute(query, tuple(data.values()))
-            
+            if not isinstance(data, dict) or not data:
+                raise DatabaseError("Insert data must be a non-empty dict")
+
+            keys = list(data.keys())
+            for k in keys:
+                _validate_ident(k)
+
+            qtable = _qtable(self.engine, table)
+            qcols = ", ".join(_qident(self.engine, k) for k in keys)
+            placeholders = ", ".join(["?" if self.engine == "sqlite" else "%s" for _ in keys])
+
+            # Postgres: if user provides id explicitly, do not call LASTVAL() (it can be undefined).
+            if self.engine == "postgres" and "id" in data:
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"
+                self.execute(query, tuple(data[k] for k in keys))
+                try:
+                    return int(data["id"])  # type: ignore[arg-type]
+                except Exception:
+                    return 0
+
+            if self.engine == "postgres":
+                # Best-effort for common PK name "id" on Postgres.
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders}) RETURNING id"
+            else:
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"
+
+            self.execute(query, tuple(data[k] for k in keys))
+
             if self.engine == "sqlite":
-                return self.cursor.lastrowid
+                return self.cursor.lastrowid  # type: ignore
             elif self.engine == "postgres":
-                self.cursor.execute("SELECT LASTVAL()")
-                return self.cursor.fetchone()[0]
+                row = self.cursor.fetchone()  # type: ignore
+                return int(row[0]) if row else 0 # type: ignore
             else:  # mysql
-                return self.cursor.lastrowid
+                return self.cursor.lastrowid  # type: ignore
         elif self.engine == "mongodb":
-            result = self.connection[table].insert_one(data)
+            result = self.connection[table].insert_one(data)  # type: ignore
             return result.inserted_id
         else:
             raise DatabaseError(f"Insert not supported for {self.engine}")
@@ -364,17 +445,29 @@ class Database:
             Number of affected rows
         """
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            set_clause = ", ".join([f"{k} = ?" if self.engine == "sqlite" else f"{k} = %s" 
+            # Security-first: refuse mass update via helper API
+            if not where:
+                raise DatabaseError("Refusing to UPDATE without a WHERE clause (security-first).")
+            if not data:
+                return 0
+
+            for k in data.keys():
+                _validate_ident(k)
+            for k in where.keys():
+                _validate_ident(k)
+
+            qtable = _qtable(self.engine, table)
+            set_clause = ", ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
                                    for k in data.keys()])
-            where_clause = " AND ".join([f"{k} = ?" if self.engine == "sqlite" else f"{k} = %s" 
+            where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
                                         for k in where.keys()])
-            query = f"UPDATE {table} SET {set_clause} WHERE {where_clause}"
+            query = f"UPDATE {qtable} SET {set_clause} WHERE {where_clause}"
             
             params = tuple(list(data.values()) + list(where.values()))
             self.execute(query, params)
-            return self.cursor.rowcount
+            return self.cursor.rowcount  # type: ignore
         elif self.engine == "mongodb":
-            result = self.connection[table].update_many(where, {"$set": data})
+            result = self.connection[table].update_many(where, {"$set": data})  # type: ignore
             return result.modified_count
         else:
             raise DatabaseError(f"Update not supported for {self.engine}")
@@ -391,14 +484,21 @@ class Database:
             Number of deleted rows
         """
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            where_clause = " AND ".join([f"{k} = ?" if self.engine == "sqlite" else f"{k} = %s" 
+            # Security-first: refuse mass delete via helper API
+            if not where:
+                raise DatabaseError("Refusing to DELETE without a WHERE clause (security-first).")
+            for k in where.keys():
+                _validate_ident(k)
+
+            qtable = _qtable(self.engine, table)
+            where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
                                         for k in where.keys()])
-            query = f"DELETE FROM {table} WHERE {where_clause}"
+            query = f"DELETE FROM {qtable} WHERE {where_clause}"
             
             self.execute(query, tuple(where.values()))
-            return self.cursor.rowcount
+            return self.cursor.rowcount  # type: ignore
         elif self.engine == "mongodb":
-            result = self.connection[table].delete_many(where)
+            result = self.connection[table].delete_many(where)  # type: ignore
             return result.deleted_count
         else:
             raise DatabaseError(f"Delete not supported for {self.engine}")
@@ -414,9 +514,10 @@ class Database:
         if self.engine in ["sqlite", "postgres", "mysql"]:
             columns = []
             for name, dtype in schema.items():
-                columns.append(f"{name} {dtype}")
-            
-            query = f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(columns)})"
+                _validate_ident(name)
+                columns.append(f"{_qident(self.engine, name)} {dtype}")
+
+            query = f"CREATE TABLE IF NOT EXISTS {_qtable(self.engine, table)} ({', '.join(columns)})"
             self.execute(query)
             self.commit()
         elif self.engine == "mongodb":
@@ -432,7 +533,7 @@ class Database:
             self.execute(query)
             self.commit()
         elif self.engine == "mongodb":
-            self.connection[table].drop()
+            self.connection[table].drop()  # type: ignore
         else:
             raise DatabaseError(f"Drop table not supported for {self.engine}")
 
@@ -584,12 +685,31 @@ class Migration:
     
     def _ensure_migration_table(self):
         """Ensure migration tracking table exists."""
-        self.db.create_table("_migrations", {
-            "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
-            "version": "VARCHAR(255) UNIQUE",
-            "applied_at": "TIMESTAMP",
-            "checksum": "VARCHAR(64)"
-        })
+        if self.db.engine == "sqlite":
+            schema = {
+                "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+                "version": "VARCHAR(255) UNIQUE",
+                "applied_at": "TIMESTAMP",
+                "checksum": "VARCHAR(64)",
+            }
+        elif self.db.engine == "postgres":
+            schema = {
+                "id": "BIGSERIAL PRIMARY KEY",
+                "version": "VARCHAR(255) UNIQUE NOT NULL",
+                "applied_at": "TIMESTAMPTZ",
+                "checksum": "VARCHAR(64)",
+            }
+        elif self.db.engine == "mysql":
+            schema = {
+                "id": "BIGINT AUTO_INCREMENT PRIMARY KEY",
+                "version": "VARCHAR(255) UNIQUE NOT NULL",
+                "applied_at": "TIMESTAMP",
+                "checksum": "VARCHAR(64)",
+            }
+        else:
+            raise DatabaseError(f"Migrations not supported for {self.db.engine}")
+
+        self.db.create_table("_migrations", schema)
     
     def apply(self, version: str, up_sql: str, down_sql: Optional[str] = None):
         """
@@ -601,8 +721,9 @@ class Migration:
             down_sql: Optional SQL to rollback the migration
         """
         # Check if already applied
+        placeholder = "?" if self.db.engine == "sqlite" else "%s"
         existing = self.db.fetch_one(
-            "SELECT * FROM _migrations WHERE version = ?", 
+            f"SELECT * FROM {_qtable(self.db.engine, '_migrations')} WHERE {_qident(self.db.engine, 'version')} = {placeholder}",
             (version,)
         )
         
@@ -724,7 +845,7 @@ class DataExporter:
             raise ExportError("pandas is required for Excel export")
         
         try:
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:  # type: ignore
                 if isinstance(tables_or_queries, str):
                     tables_or_queries = {"Sheet1": tables_or_queries}
                 
@@ -736,7 +857,7 @@ class DataExporter:
                     else:
                         data = self.db.fetch_all(f"SELECT * FROM {table_or_query}")
                     
-                    df = pd.DataFrame(data)
+                    df = pd.DataFrame(data)  # type: ignore
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
         except Exception as e:
             raise ExportError(f"Failed to export to Excel: {e}")
@@ -755,7 +876,7 @@ class DataExporter:
                 if include_create and self.db.engine == "sqlite":
                     # Get table schema
                     schema = self.db.fetch_all(
-                        f"SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                         (table,)
                     )
                     if schema:
@@ -907,7 +1028,7 @@ class DataImporter:
                 # Create table if needed
                 if create_table:
                     if has_header:
-                        schema = self._infer_schema(first_row)
+                        schema = self._infer_schema(first_row) # type: ignore
                     else:
                         schema = {f"column_{i}": "TEXT" for i in range(len(first_row))}
                     self.db.create_table(table, schema)
@@ -916,7 +1037,7 @@ class DataImporter:
                 with self.db.transaction():
                     # Insert first row
                     if has_header:
-                        self.db.insert(table, first_row)
+                        self.db.insert(table, first_row)  # type: ignore
                     else:
                         self.db.insert(table, {f"column_{i}": v for i, v in enumerate(first_row)})
                     total_inserted += 1
@@ -960,7 +1081,7 @@ class DataImporter:
             raise ImportError("pandas is required for Excel import")
         
         try:
-            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            df = pd.read_excel(file_path, sheet_name=sheet_name) # type: ignore
             
             # Use sheet name as table name if not provided
             if table is None:
@@ -970,7 +1091,7 @@ class DataImporter:
                     table = f"sheet_{sheet_name}"
             
             # Convert DataFrame to records
-            records = df.to_dict('records')
+            records = df.to_dict('records')  # type: ignore
             
             if not records:
                 return 0
@@ -985,9 +1106,9 @@ class DataImporter:
             with self.db.transaction():
                 for record in records:
                     # Convert NaN to None
-                    clean_record = {k: (None if pd.isna(v) else v) 
+                    clean_record = {k: (None if pd.isna(v) else v)   # type: ignore
                                   for k, v in record.items()}
-                    self.db.insert(table, clean_record)
+                    self.db.insert(table, clean_record)  # type: ignore
                     total_inserted += 1
             
             return total_inserted
@@ -1220,7 +1341,7 @@ class BackupRestore:
             
             # Clean up temp file if it exists
             if 'temp_path' in locals():
-                os.remove(temp_path)
+                os.remove(temp_path)  # type: ignore
                 
         except Exception as e:
             raise DatabaseError(f"Restore failed: {e}")

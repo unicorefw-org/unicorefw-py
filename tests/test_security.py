@@ -1,4 +1,14 @@
-# tests/test_security.py
+#!/usr/bin/env python3
+##############################################################################
+# /tests/test_security.py - Tests for Unicore utilities            #
+# Copyright (C) 2024 Kenny Ngo / UniCoreFW.Org / IIPTech.Info                #
+#                                                                            #
+# This file is part of UniCoreFW. You can redistribute it and/or modify      #
+# it under the terms of the [BSD-3-Clause] as published by                   #
+# the Free Software Foundation.                                              #
+# You should have received a copy of the [BSD-3-Clause] license              #
+# along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
+##############################################################################
 
 import unittest
 import sys
@@ -6,9 +16,9 @@ import os
 import time
 import tempfile
 
-
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from unicorefw import (
     RateLimiter,
     SecurityError,

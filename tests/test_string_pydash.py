@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlsplit
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
-from unicorefw import UniCoreFW  as _ # Now you can import Unicore as usual
+from unicorefw import _
 
 parametrize = pytest.mark.parametrize
 
