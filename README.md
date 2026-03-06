@@ -13,7 +13,7 @@
 
 UniCoreFW is a compact, batteries-included utility library that provides chainable and static helper functions across arrays (lists), objects (dicts / nested structures), functions, strings, security utilities, templates, and optional cryptography helpers.
 
-> **Current version:** `1.1.2`
+> **Current version:** `1.1.3`
 
 ---
 
