@@ -71,7 +71,7 @@ class UniCoreFW:
     _author = "Kenny Ngo"
     _email = "kenny@unicorefw.org"
     _description = "Universal Core Utility Library"
-    _version = "1.1.2"  # Semantic version
+    _version = "1.1.3"  # Semantic version
     _id_counter = 0  # Reserved for future use.
 
     def __init__(self, collection: Any):
