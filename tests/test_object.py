@@ -72,6 +72,18 @@ class TestUniCoreFWObjects(unittest.TestCase):
         _.defaults(obj, {"a": 0, "b": 2})
         self.assertEqual(obj, {"a": 1, "b": 2})
 
+    def test_defaults_iterable_pairs(self):
+        obj = {"a": 1}
+        result = _.defaults(obj, [("a", 0), ("b", 2)], {"b": 3, "c": 4})
+
+        self.assertIs(result, obj)
+        self.assertEqual(obj, {"a": 1, "b": 2, "c": 4})
+
+    def test_apply_if_not_none(self):
+        self.assertEqual(_.apply_if_not_none(10, lambda value: value * 2), 20)
+        self.assertIsNone(_.apply_if_not_none(None, lambda value: value * 2))
+        self.assertEqual(_.apply_if_not_none(lambda value, inc=1: value + inc, 2, inc=3), 5)
+
     def test_extend(self):
         obj = {"a": 1}
         source = {"b": 2}

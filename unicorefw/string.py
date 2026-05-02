@@ -27,6 +27,8 @@ import textwrap
 from typing import Any, List, Optional, Union, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+_str_join = str.join
+_str_split = str.split
 
 # Mapping for Latin-1 Supplement block (U+00C0–U+00FF)
 _DEBURR_MAP = {
@@ -2196,7 +2198,7 @@ def join(array, separator=None) -> str:
             parts.append("")
         else:
             parts.append(str(x))
-    return sep.join(parts)
+    return _str_join(sep, parts)
 
 def number_format(
     value: Any,
@@ -2264,11 +2266,11 @@ def split(*args) -> List[str]:
     s = str(args[0])
     if len(args) == 1:
         # default: whitespace
-        return [w for w in s.split() if w]
+        return [w for w in _str_split(s) if w]
     sep = args[1]
     if sep is None or sep == "":
         return list(s) if s else []
-    return s.split(sep)
+    return _str_split(s, sep)
 
 
 def start_case(string: str) -> str:

@@ -19,6 +19,7 @@ from typing import (
 )
 from .supporter import (
     _ensure_container,
+    _flatten as _flatten_nested,
     _flatten_keys, 
     _iter_items_like,
     _is_int_str,
@@ -32,6 +33,7 @@ from .supporter import (
     # _normalize_customizer,
     # _parse_path_str
 )
+from copy import deepcopy as _copy_deepcopy
 import math
 import re
 import random
@@ -39,14 +41,58 @@ import inspect
 import builtins
 
 # runtime ABC (for isinstance checks)
-from collections.abc import Sequence as AbcSequence
+from collections.abc import (
+    Mapping as AbcMapping,
+    MutableMapping as AbcMutableMapping,
+    Sequence as AbcSequence,
+)
 _RESTRICTED = {"__globals__", "__builtins__"}  # keep restriction *narrow*
 _MISSING = builtins.object()
+_dict_init = dict.__init__
+_dict_keys = dict.keys
+_dict_values = dict.values
 
 K = TypeVar("K")
 V = TypeVar("V")
 T = TypeVar("T")
 U = TypeVar("U")
+
+
+def _clone_builtin_containers(obj: Any) -> Any:
+    if not isinstance(obj, (dict, list)):
+        return _copy_deepcopy(obj)
+
+    root = {} if isinstance(obj, dict) else [None] * len(obj)
+    memo: Dict[int, Any] = {id(obj): root}
+    stack: List[Tuple[Any, Any]] = [(obj, root)]
+
+    while stack:
+        source, target = stack.pop()
+        iterator = source.items() if isinstance(source, dict) else enumerate(source)
+
+        for key, value in iterator:
+            if isinstance(value, dict):
+                value_id = id(value)
+                if value_id in memo:
+                    cloned = memo[value_id]
+                else:
+                    cloned = {}
+                    memo[value_id] = cloned
+                    stack.append((value, cloned))
+                target[key] = cloned
+            elif isinstance(value, list):
+                value_id = id(value)
+                if value_id in memo:
+                    cloned = memo[value_id]
+                else:
+                    cloned = [None] * len(value)
+                    memo[value_id] = cloned
+                    stack.append((value, cloned))
+                target[key] = cloned
+            else:
+                target[key] = _copy_deepcopy(value)
+
+    return root
 
 
 def invoke(obj: Any, path: Union[str, List[Union[str, int]]], *args, **kwargs) -> Any:
@@ -250,28 +296,83 @@ def defaults(
         >>> defaults({"a": 1}, {"a": 0, "b": 2})
         {"a": 1, "b": 2}
     """
-    if not isinstance(obj, MutableMapping):
+    if type(obj) is dict:
+        defaults_count = len(defaults_dicts)
+        if defaults_count == 0:
+            return obj
+
+        if defaults_count == 1 and type(defaults_dicts[0]) is dict:
+            for k, v in defaults_dicts[0].items():
+                if k not in obj:
+                    obj[k] = v
+            return obj
+
+        if (
+            defaults_count == 2
+            and type(defaults_dicts[0]) is dict
+            and type(defaults_dicts[1]) is dict
+        ):
+            for k, v in defaults_dicts[0].items():
+                if k not in obj:
+                    obj[k] = v
+            for k, v in defaults_dicts[1].items():
+                if k not in obj:
+                    obj[k] = v
+            return obj
+
+        for default in defaults_dicts:
+            if default is None:
+                continue
+
+            if type(default) is dict:
+                for k, v in default.items():
+                    if k not in obj:
+                        obj[k] = v
+                continue
+
+            items_reader = getattr(default, "items", None)
+            items = items_reader() if callable(items_reader) else default
+            try:
+                for k, v in items:  # type: ignore[union-attr]
+                    if k not in obj:
+                        obj[k] = v
+            except (TypeError, ValueError) as e:
+                raise TypeError(
+                    "Each default must be a mapping or iterable of (key, value) pairs."
+                ) from e
+        return obj
+
+    if not isinstance(obj, AbcMutableMapping):
         raise TypeError("The 'obj' parameter must be a mutable mapping.")
 
     for default in defaults_dicts:
         if default is None:
             continue
 
-        # Normalize to an items() iterator
-        if hasattr(default, "items"):  # Mapping-like
-            items = default.items()  # type: ignore[assignment]
+        if isinstance(default, AbcMapping):
+            items = default.items()
         else:
+            items_reader = getattr(default, "items", None)
+            if callable(items_reader):
+                items = items_reader()
+            else:
+                items = default
+
             try:
-                items = dict(default).items()  # supports iterable of pairs
-            except Exception as e:
+                items = iter(items)  # type: ignore[arg-type]
+            except TypeError as e:
                 raise TypeError(
                     "Each default must be a mapping or iterable of (key, value) pairs."
                 ) from e
 
-        # Set only if missing in obj
-        for k, v in items:
-            if k not in obj:
-                obj[k] = v
+        try:
+            for k, v in items:
+                if k not in obj:
+                    obj[k] = v
+        except (TypeError, ValueError) as e:
+            raise TypeError(
+                "Each default must be a mapping or iterable of (key, value) pairs."
+            ) from e
 
     return obj
 
@@ -297,7 +398,7 @@ def create(proto: Dict) -> Dict:
 
     class Obj(dict):
         def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+            _dict_init(self, *args, **kwargs)
             self.update(proto)
 
     return Obj()
@@ -518,7 +619,7 @@ def functions(obj: Dict) -> List[str]:
 
 def deep_copy(obj: Any) -> Any:
     """
-    Create a deep copy of the given object without using imports.
+    Create a deep copy of the given object.
 
     Args:
         obj: The object to copy
@@ -529,18 +630,7 @@ def deep_copy(obj: Any) -> Any:
         >>> deep_copy({"a": 1, "b": 2})
         {"a": 1, "b": 2}
     """
-    if isinstance(obj, dict):
-        return {k: deep_copy(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [deep_copy(elem) for elem in obj]
-    elif isinstance(obj, tuple):
-        return tuple(deep_copy(elem) for elem in obj)
-    elif isinstance(obj, str):
-        # Strings are immutable, return as is
-        return obj
-    else:
-        # For immutable objects like int, float, return as is
-        return obj
+    return _clone_builtin_containers(obj)
 
 ####################################################################################
 #  Extended Object Functions
@@ -679,17 +769,7 @@ def flat_map_deep(collection: List[Any], func: Callable[[Any], List[Any]]) -> Li
         >>> flat_map_deep([1, 2], nested)
         [1, 1, 1, 1, 2, 2, 2, 2]
     """
-
-    def _deep(arr):
-        out: List[Any] = []
-        for y in arr:
-            if isinstance(y, (list, tuple)):
-                out.extend(_deep(y))
-            else:
-                out.append(y)
-        return out
-
-    return _deep(flat_map(collection, func))
+    return _flatten_nested(flat_map(collection, func))
 
 
 def flat_map_depth(
@@ -714,33 +794,7 @@ def flat_map_depth(
         [1, 1, 1, 1, 2, 2, 2, 2]
     """
     result = flat_map(collection, func)
-
-    def _flatten(arr: Any, d: int) -> List[Any]:
-        """
-        Recursively flattens a list or tuple up to the given depth.
-
-        Args:
-            arr: The list or tuple to flatten.
-            d: The maximum recursion depth.
-
-        Returns:
-            A flattened list of elements.
-
-        Examples:
-            >>> _flatten([1, 2], 2)
-            [1, 1, 1, 1, 2, 2, 2, 2]
-        """
-        if d <= 0 or not isinstance(arr, (list, tuple)):
-            return [arr]
-        out: List[Any] = []
-        for y in arr:
-            if isinstance(y, (list, tuple)):
-                out.extend(_flatten(y, d - 1))
-            else:
-                out.append(y)
-        return out
-
-    return _flatten(result, depth)
+    return _flatten_nested(result, depth)
 
 
 def for_each(
@@ -1378,13 +1432,14 @@ def keys(obj):
         ["a", "b"]
     """
     if isinstance(obj, dict):
-        return list(obj.keys())
+        return list(_dict_keys(obj))
     if isinstance(obj, (list, tuple)):
-        return list(range(len(obj)))
-    if hasattr(obj, "keys") and callable(getattr(obj, "keys")):
-        return list(obj.keys())
+        return list(builtins.range(len(obj)))
+    key_reader = getattr(obj, "keys", None)
+    if callable(key_reader):
+        return list(key_reader())
     if hasattr(obj, "__dict__"):
-        return list(obj.__dict__.keys())
+        return list(_dict_keys(obj.__dict__))
     return []
 
 
@@ -1407,13 +1462,14 @@ def values(obj):
         [1, 2]
     """
     if isinstance(obj, dict):
-        return list(obj.values())
+        return list(_dict_values(obj))
     if isinstance(obj, (list, tuple)):
         return list(obj)
-    if hasattr(obj, "values") and callable(getattr(obj, "values")):
-        return list(obj.values())
+    value_reader = getattr(obj, "values", None)
+    if callable(value_reader):
+        return list(value_reader())
     if hasattr(obj, "__dict__"):
-        return list(obj.__dict__.values())
+        return list(_dict_values(obj.__dict__))
     return []
 
 
@@ -1724,44 +1780,7 @@ def clone_deep(obj: Any) -> Any:
         >>> cloned
         {'a': 1, 'b': 2}
     """
-    memo: Dict[int, Any] = {}
-    stack: list[tuple[Any, Any | None, Any | None]] = [(obj, None, None)]
-    root: Any = None
-
-    while stack:
-        src, parent, key = stack.pop()
-        sid = id(src)
-        if sid in memo:
-            val = memo[sid]
-        elif isinstance(src, dict):
-            val = {}
-            memo[sid] = val
-            # push children
-            for k, v in src.items():
-                stack.append((v, val, k))
-        elif isinstance(src, list):
-            val = []
-            memo[sid] = val
-            for i, v in enumerate(src):
-                stack.append((v, val, i))
-        else:
-            # immutable or custom object
-            try:
-                val = src.__class__(src) if hasattr(src, "__iter__") and not isinstance(src, (str, bytes, bytearray)) else src
-            except Exception:
-                val = src
-            memo[sid] = val
-
-        if parent is None:
-            root = val
-        else:
-            if isinstance(parent, list) and isinstance(key, int):
-                _ensure_len(parent, key + 1)
-                parent[key] = val
-            else:
-                parent[key] = val # type: ignore
-
-    return root
+    return _clone_builtin_containers(obj)
 
 
 def clone_deep_with(obj: Any, customizer: Callable) -> Any:
@@ -1782,17 +1801,40 @@ def clone_deep_with(obj: Any, customizer: Callable) -> Any:
         >>> cloned
         {'a': 2, 'b': 3}
     """
-    def _clone(x, key=None, parent=None):
-        customized = _call_customizer(customizer, x, key, parent)
-        if customized is not None:
-            return customized
-        if isinstance(x, dict):
-            return {k: _clone(v, k, x) for k, v in x.items()}
-        if isinstance(x, list):
-            return [_clone(v, i, x) for i, v in enumerate(x)]
-        return x
+    memo: Dict[int, Any] = {}
+    stack: List[Tuple[Any, Any, Any, Any]] = [(obj, None, None, None)]
+    root: Any = None
 
-    return _clone(obj)
+    while stack:
+        src, parent_clone, key, source_parent = stack.pop()
+        customized = _call_customizer(customizer, src, key, source_parent)
+        src_id = id(src)
+
+        if customized is not None:
+            cloned = customized
+        elif src_id in memo:
+            cloned = memo[src_id]
+        elif isinstance(src, dict):
+            cloned = {}
+            memo[src_id] = cloned
+            for child_key, child_value in reversed(list(src.items())):
+                stack.append((child_value, cloned, child_key, src))
+        elif isinstance(src, list):
+            cloned = [None] * len(src)
+            memo[src_id] = cloned
+            for index in reversed(builtins.range(len(src))):
+                stack.append((src[index], cloned, index, src))
+        else:
+            cloned = src
+
+        if parent_clone is None:
+            root = cloned
+        elif isinstance(parent_clone, list) and isinstance(key, int):
+            parent_clone[key] = cloned
+        else:
+            parent_clone[key] = cloned
+
+    return root
 
 
 def defaults_deep(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -1819,30 +1861,43 @@ def defaults_deep(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any,
         >>> obj == {"a": 1, "b": 2, "c": 3}
         True
     """
-    def _dd(a, b):
-        # both dicts
-        if isinstance(a, dict) and isinstance(b, dict):
-            for k, v in b.items():
-                if k in a:
-                    a[k] = _dd(a[k], v)
-                else:
-                    a[k] = clone_deep(v) if isinstance(v, (dict, list)) else v
-            return a
-        # element-wise lists-of-dicts merge (no append)
-        if isinstance(a, list) and isinstance(b, list):
-            m = min(len(a), len(b))
-            for i in range(m):
-                if isinstance(a[i], dict) and isinstance(b[i], dict):
-                    a[i] = _dd(a[i], b[i])
-            return a
-        # if a already set, keep it
-        return (
-            a if a is not None else clone_deep(b) if isinstance(b, (dict, list)) else b
-        )
-
     for src in sources:
-        if isinstance(src, dict):
-            target = _dd(target, src) # type: ignore
+        if not isinstance(src, dict):
+            continue
+
+        stack: List[Tuple[Any, Any, Any, Any]] = [(target, src, None, None)]
+        while stack:
+            current, defaults_obj, parent, parent_key = stack.pop()
+
+            if isinstance(current, dict) and isinstance(defaults_obj, dict):
+                for key, value in defaults_obj.items():
+                    if key not in current:
+                        current[key] = clone_deep(value) if isinstance(value, (dict, list)) else value
+                        continue
+
+                    existing = current[key]
+                    if isinstance(existing, dict) and isinstance(value, dict):
+                        stack.append((existing, value, current, key))
+                    elif isinstance(existing, list) and isinstance(value, list):
+                        stack.append((existing, value, current, key))
+                    elif existing is None:
+                        current[key] = clone_deep(value) if isinstance(value, (dict, list)) else value
+                continue
+
+            if isinstance(current, list) and isinstance(defaults_obj, list):
+                limit = min(len(current), len(defaults_obj))
+                for index in builtins.range(limit):
+                    if isinstance(current[index], dict) and isinstance(defaults_obj[index], dict):
+                        stack.append((current[index], defaults_obj[index], current, index))
+                continue
+
+            if current is None and parent is not None:
+                replacement = (
+                    clone_deep(defaults_obj)
+                    if isinstance(defaults_obj, (dict, list))
+                    else defaults_obj
+                )
+                parent[parent_key] = replacement
     return target
 
 
@@ -1883,59 +1938,57 @@ def merge(*objects: Any) -> Any:
     if head is None:
         return None
 
-    def _merge_two(a: Any, b: Any) -> Any:
-        # If either isn’t a dict, prefer b unless b is None
-        if not isinstance(a, dict) or not isinstance(b, dict):
-            if isinstance(a, (dict, list)) and b is None:
-                return clone_deep(a)
-            if isinstance(b, (dict, list)):
-                return clone_deep(b)
-            return b if b is not None else a
-
-        # Both dicts: start with a (cloned where needed), then fold in b
-        res: Dict[Any, Any] = {
-            k: clone_deep(v) if isinstance(v, (dict, list)) else v
-            for k, v in a.items()
-        }
-
-        for k, v in b.items():
-            if k in res:
-                av = res[k]
-                if isinstance(av, dict) and isinstance(v, dict):
-                    res[k] = _merge_two(av, v)
-                elif isinstance(av, list) and isinstance(v, list):
-                    # Element-wise merge for lists (no blind append)
-                    m = max(len(av), len(v))
-                    out: List[Any] = []
-                    for i in range(m):
-                        if i < len(av) and i < len(v) and isinstance(av[i], dict) and isinstance(v[i], dict):
-                            out.append(_merge_two(av[i], v[i]))
-                        elif i < len(av) and i < len(v):
-                            out.append(clone_deep(v[i]))
-                        elif i < len(av):
-                            out.append(clone_deep(av[i]))
-                        else:
-                            out.append(clone_deep(v[i]))
-                    res[k] = out
-                else:
-                    res[k] = clone_deep(v) if isinstance(v, (dict, list)) else v
-            else:
-                res[k] = clone_deep(v) if isinstance(v, (dict, list)) else v
-
-        return res
-
     result: Any = head if isinstance(head, dict) else {}
     # If head is a dict, fold remaining dicts into it; otherwise just fold all dicts
     for o in (objects[1:] if isinstance(head, dict) else objects):
         if isinstance(o, dict):
-            result = _merge_two(result, o) if result else clone_deep(o)
+            if not result:
+                result = clone_deep(o)
+                continue
+
+            if result is head:
+                result = clone_deep(result)
+
+            stack: List[Tuple[Dict[Any, Any], Dict[Any, Any]]] = [(result, o)]
+            while stack:
+                target_obj, source_obj = stack.pop()
+                for k, v in source_obj.items():
+                    if k not in target_obj:
+                        target_obj[k] = clone_deep(v) if isinstance(v, (dict, list)) else v
+                        continue
+
+                    existing = target_obj[k]
+                    if isinstance(existing, dict) and isinstance(v, dict):
+                        stack.append((existing, v))
+                    elif isinstance(existing, list) and isinstance(v, list):
+                        merged_list: List[Any] = []
+                        limit = max(len(existing), len(v))
+                        for index in builtins.range(limit):
+                            if (
+                                index < len(existing)
+                                and index < len(v)
+                                and isinstance(existing[index], dict)
+                                and isinstance(v[index], dict)
+                            ):
+                                child = clone_deep(existing[index])
+                                merged_list.append(child)
+                                stack.append((child, v[index]))
+                            elif index < len(existing) and index < len(v):
+                                merged_list.append(clone_deep(v[index]))
+                            elif index < len(existing):
+                                merged_list.append(clone_deep(existing[index]))
+                            else:
+                                merged_list.append(clone_deep(v[index]))
+                        target_obj[k] = merged_list
+                    else:
+                        target_obj[k] = clone_deep(v) if isinstance(v, (dict, list)) else v
         elif result == {} and o in (None, [], {}):
             # ignore empty-ish inputs
             continue
 
     return result
 
-def omit(obj, *keys_to_omit):
+def omit(obj, *paths_to_exclude):
     """
     Omit properties from an object.
 
@@ -1953,12 +2006,12 @@ def omit(obj, *keys_to_omit):
         >>> omit({"a": 1, "b": 2, "c": 3}, ["a", "c"]) == {"b": 2}
         True
     """
-    keys_flat = _flatten_keys(keys_to_omit)
+    keys_flat = _flatten_keys(paths_to_exclude)
     if isinstance(obj, (list, tuple)):
         base = to_dict(obj)
         return {k: v for k, v in base.items() if k not in keys_flat}
     base = dict(_iter_items_like(obj)) if not isinstance(obj, dict) else obj
-    # deep path omit (e.g., "a.b[0].c")
+    # deep path removal, e.g. "a.b[0].c"
     simple_keys = [
         k
         for k in keys_flat
@@ -2020,7 +2073,7 @@ def assign_with(target: dict, *sources, customizer=None) -> dict:
     if customizer is None and sources and callable(sources[-1]):
         *sources, customizer = sources
     if customizer is None or not callable(customizer):
-        raise TypeError("assign_with() missing 1 required argument: 'customizer'")
+        raise TypeError("assign_with missing 1 required argument: 'customizer'")
 
     for src in sources:
         if not isinstance(src, dict):
@@ -2092,16 +2145,48 @@ def map_values_deep(obj: Any, fn: Callable[..., Any]) -> Any:
         >>> z == {"a": ["a"], "b": {"c": ["b", "c"]}}
         True
     """
-    def _walk(x: Any, path: List[Union[str, int]]) -> Any:
-        if isinstance(x, dict):
-            return {k: _walk(v, path + [k]) for k, v in x.items()}
-        if isinstance(x, list):
-            return [_walk(v, path + [i]) for i, v in enumerate(x)]
+    if not isinstance(obj, (dict, list)):
         try:
-            return fn(x, path)          # (value, property_path)
+            return fn(obj, [])
         except TypeError:
-            return fn(x)                # (value) fallback
-    return _walk(obj, [])
+            return fn(obj)
+
+    root = {} if isinstance(obj, dict) else [None] * len(obj)
+    memo: Dict[int, Any] = {id(obj): root}
+    stack: List[Tuple[Any, Any, List[Union[str, int]]]] = [(obj, root, [])]
+
+    while stack:
+        current, mapped, path = stack.pop()
+        iterator = current.items() if isinstance(current, dict) else enumerate(current)
+
+        for key, value in iterator:
+            child_path = path + [key]
+            if isinstance(value, dict):
+                value_id = id(value)
+                if value_id in memo:
+                    child = memo[value_id]
+                else:
+                    child = {}
+                    memo[value_id] = child
+                    stack.append((value, child, child_path))
+                mapped[key] = child
+            elif isinstance(value, list):
+                value_id = id(value)
+                if value_id in memo:
+                    child = memo[value_id]
+                else:
+                    child = [None] * len(value)
+                    memo[value_id] = child
+                    stack.append((value, child, child_path))
+                mapped[key] = child
+            else:
+                try:
+                    mapped_value = fn(value, child_path)
+                except TypeError:
+                    mapped_value = fn(value)
+                mapped[key] = mapped_value
+
+    return root
 
 
 def apply(fn: Callable[..., U], *args: Any, **kwargs: Any) -> U:
@@ -2144,10 +2229,36 @@ def apply_if_not_none(fn: Callable[..., U], *args: Any, **kwargs: Any) -> Option
         >>> apply_if_not_none(lambda x, y: x + y, 1, None)
         None
     """
+    if callable(fn):
+        if not args:
+            return fn(**kwargs) if kwargs else fn()
+        if len(args) == 1:
+            arg = args[0]
+            if arg is None:
+                return None
+            return fn(arg, **kwargs) if kwargs else fn(arg)
+        for arg in args:
+            if arg is None:
+                return None
+        return fn(*args, **kwargs)
+
+    if args and callable(args[0]):
+        if fn is None:
+            return None
+        real_fn = args[0]
+        if len(args) == 1:
+            return real_fn(fn, **kwargs) if kwargs else real_fn(fn)
+        rest = args[1:]
+        for arg in rest:
+            if arg is None:
+                return None
+        return real_fn(fn, *rest, **kwargs)
+
     real_fn, a, kw = _split_apply_args(fn, *args, **kwargs)
-    if all(arg is not None for arg in a):
-        return real_fn(*a, **kw)
-    return None
+    for arg in a:
+        if arg is None:
+            return None
+    return real_fn(*a, **kw)
 
 
 # SHALLOW clone_with: apply customizer at the first level only.
@@ -2319,46 +2430,72 @@ def merge_with(*objects, customizer=None):
                 except TypeError:
                     return customizer(src_val)
 
-    def _merge(a, b, parent=None, key=None):
-        # Give customizer first shot
-        cv = _call_c(a, b, key, parent)
-        if cv is not None:
-            return cv
-
-        # default deep behavior
-        if isinstance(a, dict) and isinstance(b, dict):
-            out = {k: clone_deep(v) if isinstance(v, (dict, list)) else v for k, v in a.items()} # type: ignore
-            for k2, v2 in b.items():
-                if k2 in out:
-                    out[k2] = _merge(out[k2], v2, out, k2)
-                else:
-                    out[k2] = clone_deep(v2) if isinstance(v2, (dict, list)) else v2
-            return out
-
-        if isinstance(a, list) and isinstance(b, list):
-            # default: element-wise (your merge semantics)
-            m = max(len(a), len(b))
-            out: List[Any] = []
-            for i in range(m):
-                if i < len(a) and i < len(b) and isinstance(a[i], dict) and isinstance(b[i], dict):
-                    out.append(_merge(a[i], b[i], a, i))
-                elif i < len(a) and i < len(b):
-                    out.append(clone_deep(b[i]))
-                elif i < len(a):
-                    out.append(clone_deep(a[i]))
-                else:
-                    out.append(clone_deep(b[i]))
-            return out
-
-        # scalar or mismatched types: prefer b unless b is None
-        if isinstance(b, (dict, list)):
-            return clone_deep(b)
-        return b if b is not None else a
-
     head, *rest = objects
     result = clone_deep(head) if isinstance(head, (dict, list)) else head
-    for idx, nxt in enumerate(rest):
-        result = _merge(result, nxt, None, None)
+    for nxt in rest:
+        stack: List[Tuple[Any, Any, Any, Any]] = [(result, nxt, None, None)]
+        while stack:
+            left, right, parent, key = stack.pop()
+
+            customized = _call_c(left, right, key, parent)
+            if customized is not None:
+                if parent is None:
+                    result = customized
+                else:
+                    parent[key] = customized
+                continue
+
+            if isinstance(left, dict) and isinstance(right, dict):
+                if parent is None:
+                    result = left
+                else:
+                    parent[key] = left
+
+                for child_key, child_value in right.items():
+                    if child_key in left:
+                        stack.append((left[child_key], child_value, left, child_key))
+                    else:
+                        left[child_key] = (
+                            clone_deep(child_value)
+                            if isinstance(child_value, (dict, list))
+                            else child_value
+                        )
+                continue
+
+            if isinstance(left, list) and isinstance(right, list):
+                merged_list: List[Any] = []
+                limit = max(len(left), len(right))
+                if parent is None:
+                    result = merged_list
+                else:
+                    parent[key] = merged_list
+
+                for index in builtins.range(limit):
+                    if (
+                        index < len(left)
+                        and index < len(right)
+                        and isinstance(left[index], dict)
+                        and isinstance(right[index], dict)
+                    ):
+                        child = clone_deep(left[index])
+                        merged_list.append(child)
+                        stack.append((child, right[index], merged_list, index))
+                    elif index < len(left) and index < len(right):
+                        merged_list.append(clone_deep(right[index]))
+                    elif index < len(left):
+                        merged_list.append(clone_deep(left[index]))
+                    else:
+                        merged_list.append(clone_deep(right[index]))
+                continue
+
+            replacement = clone_deep(right) if isinstance(right, (dict, list)) else right
+            if replacement is None:
+                replacement = left
+
+            if parent is None:
+                result = replacement
+            else:
+                parent[key] = replacement
     return result
 
 def parse_int(value: Any, radix: Optional[int] = None) -> Optional[int]:

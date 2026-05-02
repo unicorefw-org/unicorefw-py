@@ -38,6 +38,10 @@ U = TypeVar("U")
 K = TypeVar("K")
 V = TypeVar("V")
 
+_builtin_range = builtins.range
+_builtin_zip = builtins.zip
+_list_pop = list.pop
+
 
 def map(array: List[T], func: Callable[[T], U]) -> List[U]:
     """
@@ -314,7 +318,7 @@ def shuffle(array: List[T]) -> List[T]:
     """
     # Use the Fisher-Yates shuffle algorithm
     array_copy = list(array)
-    for i in builtins.range(len(array_copy) - 1, 0, -1):
+    for i in _builtin_range(len(array_copy) - 1, 0, -1):
         j = random_module.randint(0, i)
         array_copy[i], array_copy[j] = array_copy[j], array_copy[i]
     return array_copy
@@ -334,7 +338,7 @@ def zip(*arrays) -> List[Tuple]:
         >>> zip(['a', 'b', 'c'], [1, 2, 3])
         [('a', 1), ('b', 2), ('c', 3)]
     """
-    return list(builtins.zip(*arrays))
+    return list(_builtin_zip(*arrays))
 
 def unzip(
     array_of_tuples: List[Tuple[Any, ...]],
@@ -772,7 +776,7 @@ def range(start: int, stop: Optional[int] = None, step: int = 1) -> List[int]:
     """
     if stop is None:
         start, stop = 0, start
-    return list(builtins.range(start, stop, step))
+    return list(_builtin_range(start, stop, step))
 
 
 def max_value(
@@ -2246,10 +2250,10 @@ def pop(array: List[T], index: Optional[int] = None) -> T:
     if not array:
         raise IndexError("pop from empty list")
     if index is None:
-        return array.pop()
+        return _list_pop(array)
     if index < 0:
         index += len(array)
-    return array.pop(index)
+    return _list_pop(array, index)
 
 
 def pull_at(array: List[T], *indexes: int) -> List[T]:

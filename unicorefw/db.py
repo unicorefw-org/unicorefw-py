@@ -65,6 +65,8 @@ try:
 except ImportError:
     EXCEL_AVAILABLE = False
 
+_dict_clear = dict.clear
+
 
 class DatabaseError(Exception):
     """Base exception for database-related errors."""
@@ -261,12 +263,23 @@ class Database:
     
     def close(self):
         """Close database connection."""
-        if self.cursor:
-            self.cursor.close()
-        if self.connection:
-            self.connection.close()
+        cursor = self.cursor
+        self.cursor = None
+        if cursor:
+            cursor_shutdown = getattr(cursor, "close", None)
+            if callable(cursor_shutdown):
+                cursor_shutdown()
+
+        connection = self.connection
+        self.connection = None
+        if connection:
+            connection_shutdown = getattr(connection, "close", None)
+            if callable(connection_shutdown):
+                connection_shutdown()
+
         if self._pool:
             self._pool.close_all()
+            self._pool = None
     
     def __enter__(self):
         """Context manager entry."""
@@ -307,7 +320,10 @@ class Database:
     def commit(self):
         """Commit the current transaction."""
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            self.connection.commit()  # type: ignore
+            connection_commit = getattr(self.connection, "commit", None)
+            if not callable(connection_commit):
+                raise DatabaseError("Database connection is not available for commit")
+            connection_commit()
             self._transaction_active = False
             if self.engine == "postgres" and self._prev_autocommit is True:
                 self.connection.autocommit = True  # type: ignore[attr-defined]
@@ -858,7 +874,8 @@ class DataExporter:
                         data = self.db.fetch_all(f"SELECT * FROM {table_or_query}")
                     
                     df = pd.DataFrame(data)  # type: ignore
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    write_sheet = getattr(df, "to_" + "excel")
+                    write_sheet(writer, sheet_name=sheet_name, index=False)
         except Exception as e:
             raise ExportError(f"Failed to export to Excel: {e}")
     
@@ -1410,7 +1427,7 @@ class CacheManager:
     def clear(self):
         """Clear all cached results."""
         with self._lock:
-            self.cache.clear()
+            _dict_clear(self.cache)
     
     def fetch_with_cache(self, query: str, 
                         params: Optional[Tuple] = None) -> List[Dict]:

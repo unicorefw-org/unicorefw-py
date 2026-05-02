@@ -31,6 +31,7 @@ from . import types
 from . import security
 from . import template
 from . import db
+from . import orm
 
 
 _MODULES_IN_ORDER = [
@@ -43,7 +44,8 @@ _MODULES_IN_ORDER = [
     types,
     security,
     template,
-    db
+    db,
+    orm
 ]
 
 # Note: UniCoreFWWrapper intentionally wraps strings as chainable values as well.
@@ -52,6 +54,7 @@ _CHAINABLE_RESULT_TYPES: Tuple[type, ...] = (str, dict, list, tuple, set)
 # Registry of exported UniCoreFW functions. First match wins according to _MODULES_IN_ORDER.
 # Built once at import time for O(1) runtime dispatch.
 _FUNCTION_REGISTRY: Dict[str, Callable[..., Any]] = {}
+_object_getattribute = object.__getattribute__
 
 
 class UniCoreFW:
@@ -71,7 +74,7 @@ class UniCoreFW:
     _author = "Kenny Ngo"
     _email = "kenny@unicorefw.org"
     _description = "Universal Core Utility Library"
-    _version = "1.1.3"  # Semantic version
+    _version = "1.1.4"  # Semantic version
     _id_counter = 0  # Reserved for future use.
 
     def __init__(self, collection: Any):
@@ -86,13 +89,13 @@ class UniCoreFW:
         to the class, which would otherwise shadow wrapper methods on instances.
         """
         if item == "wrapper" or item.startswith("_"):
-            return object.__getattribute__(self, item)
+            return _object_getattribute(self, item)
 
-        wrapper = object.__getattribute__(self, "wrapper")
+        wrapper = _object_getattribute(self, "wrapper")
         try:
             return getattr(wrapper, item)
         except AttributeError:
-            return object.__getattribute__(self, item)
+            return _object_getattribute(self, item)
 
     def __call__(self, collection: Any) -> "UniCoreFWWrapper":
         return UniCoreFWWrapper(collection)
@@ -176,7 +179,7 @@ class UniCoreFWWrapper:
     def chain(self) -> "UniCoreFWWrapper":
         """Return self to support fluent chaining."""
         return self
-
+    
 
 def _build_function_registry() -> None:
     """

@@ -197,6 +197,32 @@ def test_clone_deep(case):
         assert value is not case[key]
 
 
+def test_clone_deep_handles_cyclic_dict():
+    case = {}
+    case["self"] = case
+
+    result = _.clone_deep(case)
+
+    assert result is not case
+    assert result["self"] is result
+
+
+def test_deep_copy_handles_deep_lists_without_recursion_error():
+    case = value = []
+    for _index in range(1500):
+        child = []
+        value.append(child)
+        value = child
+
+    result = _.deep_copy(case)
+
+    assert result is not case
+    cursor = result
+    for _index in range(1500):
+        assert isinstance(cursor, list)
+        cursor = cursor[0]
+
+
 @parametrize(
     "case,iteratee,expected",
     [
@@ -614,6 +640,17 @@ def test_map_values_deep(case, expected):
     assert _.map_values_deep(*case) == expected
 
 
+def test_map_values_deep_preserves_cycles():
+    case = {}
+    case["self"] = case
+    case["value"] = "leaf"
+
+    result = _.map_values_deep(case, lambda value, path: ".".join(path) + ":" + value)
+
+    assert result["self"] is result
+    assert result["value"] == "value:leaf"
+
+
 @parametrize(
     "case,expected",
     [
@@ -688,6 +725,27 @@ def test_map_values_deep(case, expected):
 )
 def test_merge(case, expected):
     assert _.merge(*case) == expected
+
+
+def test_merge_handles_deep_dicts_without_recursion_error():
+    left = {}
+    right = {}
+    left_cursor = left
+    right_cursor = right
+    for _index in range(1200):
+        left_cursor["child"] = {}
+        right_cursor["child"] = {}
+        left_cursor = left_cursor["child"]
+        right_cursor = right_cursor["child"]
+    left_cursor["left"] = 1
+    right_cursor["right"] = 2
+
+    result = _.merge(left, right)
+
+    cursor = result
+    for _index in range(1200):
+        cursor = cursor["child"]
+    assert cursor == {"left": 1, "right": 2}
 
 
 def test_merge_no_link_dict():

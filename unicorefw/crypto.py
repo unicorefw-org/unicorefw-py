@@ -16,15 +16,19 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 try:
-    from cryptography.fernet import Fernet, InvalidToken # type: ignore
+    from cryptography.fernet import Fernet, InvalidToken as FernetInvalidToken # type: ignore
 
+    _fernet_generate_key = Fernet.generate_key
     CRYPTO_AVAILABLE = True
 except ImportError:
     # If cryptography isn't installed, these functions won't work
+    Fernet = None  # type: ignore
+    FernetInvalidToken = None  # type: ignore
+    _fernet_generate_key = None
     CRYPTO_AVAILABLE = False
 
 class InvalidToken(ValueError):
-    """Raised when data sanitization fails."""
+    """Raised when Fernet ciphertext cannot be decrypted."""
     pass
 
 def generate_key() -> bytes:
@@ -44,7 +48,7 @@ def generate_key() -> bytes:
     """
     if not CRYPTO_AVAILABLE:
         raise RuntimeError("cryptography library is not installed.")
-    return Fernet.generate_key() # type: ignore
+    return _fernet_generate_key() # type: ignore[misc]
 
 
 def encrypt_string(plaintext: str, key: bytes) -> str:
@@ -99,5 +103,5 @@ def decrypt_string(ciphertext: str, key: bytes) -> str:
     try:
         decrypted = f.decrypt(ciphertext.encode("utf-8"))
         return decrypted.decode("utf-8")
-    except InvalidToken:
+    except FernetInvalidToken as exc: # type: ignore[misc]
         raise ValueError("Decryption failed: Invalid key or ciphertext.")
