@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://unicorefw.org/img/logo.png?v=1.1.2" alt="UniCoreFW logo" />
+  <img src="https://unicorefw.org/static/assets/images/icon.png?v=1.1.3" alt="UniCoreFW logo" />
 </p>
 
 [![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)](https://pypistats.org/packages/unicorefw)
