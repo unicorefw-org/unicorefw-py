@@ -32,6 +32,13 @@ from . import security
 from . import template
 from . import db
 from . import orm
+from ._metadata import (
+    AUTHOR,
+    AUTHOR_EMAIL,
+    DESCRIPTION,
+    PACKAGE_DISPLAY_NAME,
+    VERSION,
+)
 
 
 _MODULES_IN_ORDER = [
@@ -70,11 +77,11 @@ class UniCoreFW:
         over UniCoreFW's static methods, to make chaining ergonomic and predictable.
     """
 
-    _name = "UniCoreFW"
-    _author = "Kenny Ngo"
-    _email = "kenny@unicorefw.org"
-    _description = "Universal Core Utility Library"
-    _version = "1.1.4"  # Semantic version
+    _name = PACKAGE_DISPLAY_NAME
+    _author = AUTHOR
+    _email = AUTHOR_EMAIL
+    _description = DESCRIPTION
+    _version = VERSION  # Semantic version
     _id_counter = 0  # Reserved for future use.
 
     def __init__(self, collection: Any):
