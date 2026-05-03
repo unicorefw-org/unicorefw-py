@@ -1,0 +1,16 @@
+# Funding links for UniCoreFW-PY
+# Repository: https://github.com/unicorefw-org/unicorefw-py
+#
+# GitHub Sponsors:
+# Enable GitHub Sponsors for the organization first:
+# https://github.com/sponsors/unicorefw-org
+
+github: unicorefw-org
+
+# Optional: enable this only if UniCoreFW is listed/managed through Tidelift.
+# For Python packages, GitHub uses the pypi/package-name format.
+# tidelift: pypi/unicorefw
+
+# Optional: add a real direct sponsorship/donation page when available.
+# GitHub allows up to four custom funding URLs.
+# custom: ["https://unicorefw.org/sponsor"]
