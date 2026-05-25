@@ -5,8 +5,7 @@
 # Enable GitHub Sponsors for the organization first:
 # https://github.com/sponsors/unicorefw-org
 
-github: unicorefw-org
-
+github: [kenny-ngo, unicorefw-org]
 # Optional: enable this only if UniCoreFW is listed/managed through Tidelift.
 # For Python packages, GitHub uses the pypi/package-name format.
 # tidelift: pypi/unicorefw
