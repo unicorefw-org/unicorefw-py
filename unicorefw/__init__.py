@@ -23,6 +23,7 @@ from .function import *
 from .utils import *
 from .types import *
 from .security import *
+from .regex_policy import *
 from .string import *
 from .crypto import *
 from .template import *

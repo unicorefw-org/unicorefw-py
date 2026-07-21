@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61,<83", "wheel>=0.38,<1"]
+build-backend = "setuptools.build_meta"
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["unicorefw"]
+
+[tool.coverage.report]
+fail_under = 75
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.json]
+output = "coverage.json"

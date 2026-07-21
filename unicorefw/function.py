@@ -23,12 +23,103 @@ from .supporter import (
     _try_import,
     _try_asyncio_schedule
 )
+from .security import (
+    ResourceLimitError,
+    _validate_resource_duration,
+    _validate_resource_limit,
+)
 
 T = TypeVar("T")
 U = TypeVar("U")
 R = TypeVar("R")
 
-def debounce(func: Callable, wait: int) -> Callable:
+_DEFAULT_MAX_PENDING_TIMERS = 8
+_HARD_MAX_PENDING_TIMERS = 256
+_GLOBAL_MAX_PENDING_TIMERS = 1024
+_HARD_MAX_GLOBAL_TIMERS = 4096
+_HARD_MAX_TIMER_WAIT_MILLISECONDS = 24 * 60 * 60 * 1000
+
+
+class _BudgetedTimer(threading.Timer):
+    """Release a timer reservation after cancellation or callback completion."""
+
+    def __init__(self, *args, on_finish: Callable[["_BudgetedTimer"], None], **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_finish = on_finish
+
+    def run(self) -> None:
+        try:
+            super().run()
+        finally:
+            self._on_finish(self)
+
+
+class _TimerBudget:
+    """Bound pending timer threads for one wrapper or shared helper."""
+
+    def __init__(self, max_pending: int, resource: str, hard_maximum: int):
+        self.max_pending = _validate_resource_limit(
+            max_pending,
+            "max_pending_timers",
+            hard_maximum,
+        )
+        self.resource = resource
+        self._active = set()
+        self._lock = threading.Lock()
+
+    def _finished(self, timer: _BudgetedTimer) -> None:
+        with self._lock:
+            self._active.discard(timer)
+
+    def schedule(
+        self,
+        delay_seconds: float,
+        func: Callable,
+        args=(),
+        kwargs=None,
+    ) -> _BudgetedTimer:
+        with self._lock:
+            observed = len(self._active) + 1
+            if observed > self.max_pending:
+                raise ResourceLimitError(
+                    self.resource,
+                    self.max_pending,
+                    observed,
+                )
+            timer = _BudgetedTimer(
+                delay_seconds,
+                func,
+                args=args,
+                kwargs={} if kwargs is None else kwargs,
+                on_finish=self._finished,
+            )
+            timer.daemon = True
+            self._active.add(timer)
+        try:
+            timer.start()
+        except Exception:
+            self._finished(timer)
+            raise
+        return timer
+
+    def pending_count(self) -> int:
+        with self._lock:
+            return len(self._active)
+
+
+_DEFER_TIMER_BUDGET = _TimerBudget(
+    _GLOBAL_MAX_PENDING_TIMERS,
+    "pending deferred timers",
+    _HARD_MAX_GLOBAL_TIMERS,
+)
+
+
+def debounce(
+    func: Callable,
+    wait: int,
+    *,
+    max_pending_timers: int = _DEFAULT_MAX_PENDING_TIMERS,
+) -> Callable:
     """
     Debounce a function to only be called after wait milliseconds of inactivity.
     
@@ -52,39 +143,48 @@ def debounce(func: Callable, wait: int) -> Callable:
         >>> debounced = debounce(api_call, 100)
         >>> # Function will execute after 100ms of inactivity
     """
-    wait_seconds = wait / 1000.0
+    _validate_callable(func)
+    wait_seconds = _validate_resource_duration(
+        wait,
+        "wait",
+        _HARD_MAX_TIMER_WAIT_MILLISECONDS,
+        allow_zero=True,
+    ) / 1000.0
+    timer_budget = _TimerBudget(
+        max_pending_timers,
+        "pending debounce timers",
+        _HARD_MAX_PENDING_TIMERS,
+    )
     timer = None
     lock = threading.RLock()  # Reentrant lock for safety
-    max_pending_timers = 10   # Prevent DoS
-    pending_count = [0]
-    
+
     def debounced(*args, **kwargs):
         nonlocal timer
-        
-        # DoS protection
-        if pending_count[0] > max_pending_timers:
-            return  # Silently drop excessive calls
-        
+
         with lock:  # Atomic check-and-set
             if timer is not None:
                 timer.cancel()
-                pending_count[0] = max(0, pending_count[0] - 1)
-            
+
             def safe_call():
+                nonlocal timer
                 try:
                     with lock:
-                        pending_count[0] = max(0, pending_count[0] - 1)
+                        timer = None
                     func(*args, **kwargs)
                 except Exception:
-                    # Prevent exceptions from breaking debounce state
-                    with lock:
-                        pending_count[0] = max(0, pending_count[0] - 1)
-            
-            timer = threading.Timer(wait_seconds, safe_call)
-            timer.daemon = True
-            pending_count[0] += 1
-            timer.start()
-    
+                    return
+
+            timer = timer_budget.schedule(wait_seconds, safe_call)
+
+    def cancel() -> None:
+        nonlocal timer
+        with lock:
+            if timer is not None:
+                timer.cancel()
+                timer = None
+
+    debounced.cancel = cancel  # type: ignore[attr-defined]
+    debounced.pending_timer_count = timer_budget.pending_count  # type: ignore[attr-defined]
     return debounced
 
 def once(func: Callable) -> Callable:
@@ -260,7 +360,8 @@ def defer(func: Callable, *args, **kwargs) -> None:
         >>> defer(add, 1, 2)
         >>> 3
     """
-    threading.Timer(0, func, args=args, kwargs=kwargs).start()
+    _validate_callable(func)
+    _DEFER_TIMER_BUDGET.schedule(0, func, args=args, kwargs=kwargs)
 
 
 def wrap(func: Callable, wrapper: Callable) -> Callable:
@@ -711,7 +812,13 @@ def enhanced_partial_right(func: Callable, *bound_args, **bound_kwargs) -> Calla
     return _copy_function_metadata(wrapper, func)
 
 
-def enhanced_debounce(func: Callable, wait: int, max_wait: Optional[int] = None) -> Callable:
+def enhanced_debounce(
+    func: Callable,
+    wait: int,
+    max_wait: Optional[int] = None,
+    *,
+    max_pending_timers: int = _DEFAULT_MAX_PENDING_TIMERS,
+) -> Callable:
     """
     Enhanced debounce with max_wait support for better control.
     
@@ -731,8 +838,27 @@ def enhanced_debounce(func: Callable, wait: int, max_wait: Optional[int] = None)
     """
     _validate_callable(func)
     
-    wait_seconds = wait / 1000.0
-    max_wait_seconds = max_wait / 1000.0 if max_wait else None
+    wait_seconds = _validate_resource_duration(
+        wait,
+        "wait",
+        _HARD_MAX_TIMER_WAIT_MILLISECONDS,
+        allow_zero=True,
+    ) / 1000.0
+    max_wait_seconds = (
+        _validate_resource_duration(
+            max_wait,
+            "max_wait",
+            _HARD_MAX_TIMER_WAIT_MILLISECONDS,
+        )
+        / 1000.0
+        if max_wait is not None
+        else None
+    )
+    timer_budget = _TimerBudget(
+        max_pending_timers,
+        "pending enhanced debounce timers",
+        _HARD_MAX_PENDING_TIMERS,
+    )
     
     timer = None
     max_timer = None
@@ -769,15 +895,32 @@ def enhanced_debounce(func: Callable, wait: int, max_wait: Optional[int] = None)
                 
                 # Set max wait timer if specified
                 if max_wait_seconds:
-                    max_timer = threading.Timer(max_wait_seconds, execute)
-                    max_timer.start()
+                    max_timer = timer_budget.schedule(max_wait_seconds, execute)
             
             # Set regular debounce timer
-            timer = threading.Timer(wait_seconds, execute)
-            timer.start()
+            try:
+                timer = timer_budget.schedule(wait_seconds, execute)
+            except Exception:
+                if max_timer is not None:
+                    max_timer.cancel()
+                    max_timer = None
+                raise
         
         return result[0]
     
+    def cancel() -> None:
+        nonlocal timer, max_timer
+        with lock:
+            if timer is not None:
+                timer.cancel()
+                timer = None
+            if max_timer is not None:
+                max_timer.cancel()
+                max_timer = None
+            first_call_time[0] = None
+
+    debounced.cancel = cancel  # type: ignore[attr-defined]
+    debounced.pending_timer_count = timer_budget.pending_count  # type: ignore[attr-defined]
     return _copy_function_metadata(debounced, func)
 
 
@@ -807,13 +950,29 @@ def partial_right(func: Callable, *bound_args, **bound_kwargs) -> Callable:
     return enhanced_partial_right(func, *bound_args, **bound_kwargs)
 
 
-def debounce_(func: Callable, wait: int, *, max_wait: Optional[int] = None, use_main_thread: bool = False) -> Callable:
+def debounce_(
+    func: Callable,
+    wait: int,
+    *,
+    max_wait: Optional[int] = None,
+    use_main_thread: bool = False,
+    max_pending_timers: int = _DEFAULT_MAX_PENDING_TIMERS,
+) -> Callable:
     """Enhanced debounce with max_wait support."""
     if max_wait is not None:
-        return enhanced_debounce(func, wait, max_wait)
+        return enhanced_debounce(
+            func,
+            wait,
+            max_wait,
+            max_pending_timers=max_pending_timers,
+        )
     else:
         # Use original implementation for backward compatibility
-        return enhanced_debounce(func, wait)
+        return enhanced_debounce(
+            func,
+            wait,
+            max_pending_timers=max_pending_timers,
+        )
 
 
 def over_args(func: Callable, *transforms: Callable) -> Callable:

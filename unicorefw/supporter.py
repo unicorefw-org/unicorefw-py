@@ -16,6 +16,7 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 
 import ast
 from collections import deque
+from dataclasses import dataclass
 import re
 from typing import (
     Any, Callable, Dict, Iterable, List, 
@@ -24,8 +25,64 @@ from typing import (
 )
 import unicodedata
 
+from .security import ResourceLimitError, _validate_resource_limit
+
 PathKey = Union[str, int, Tuple[Any, ...]]
 Path = TypingSequence[PathKey]
+
+_HARD_MAX_PATH_LENGTH = 65_536
+_HARD_MAX_PATH_DEPTH = 256
+_HARD_MAX_PATH_LIST_LENGTH = 1_000_000
+
+
+@dataclass(frozen=True)
+class PathLimits:
+    """Resource budgets for parsing and creating nested paths."""
+
+    max_path_length: int = 4_096
+    max_depth: int = 64
+    max_list_length: int = 10_000
+
+    def __post_init__(self) -> None:
+        _validate_resource_limit(
+            self.max_path_length,
+            "max_path_length",
+            _HARD_MAX_PATH_LENGTH,
+        )
+        _validate_resource_limit(
+            self.max_depth,
+            "max_depth",
+            _HARD_MAX_PATH_DEPTH,
+        )
+        _validate_resource_limit(
+            self.max_list_length,
+            "max_list_length",
+            _HARD_MAX_PATH_LIST_LENGTH,
+        )
+
+
+_DEFAULT_PATH_LIMITS = PathLimits()
+
+
+def _resolve_path_limits(limits: Optional[PathLimits]) -> PathLimits:
+    if limits is None:
+        return _DEFAULT_PATH_LIMITS
+    if not isinstance(limits, PathLimits):
+        raise TypeError("limits must be a PathLimits instance")
+    return limits
+
+
+def _validate_path_parts(parts: Path, limits: PathLimits, *, mutating: bool) -> None:
+    if len(parts) > limits.max_depth:
+        raise ResourceLimitError("nested path depth", limits.max_depth, len(parts))
+    if mutating:
+        for segment in parts:
+            if isinstance(segment, int) and segment >= limits.max_list_length:
+                raise ResourceLimitError(
+                    "auto-created list length",
+                    limits.max_list_length,
+                    segment + 1,
+                )
 
 def _normalize_customizer(customizer):
     """
@@ -62,7 +119,12 @@ def _normalize_customizer(customizer):
         return None
 
 def _ensure_container(
-    parent, key, ctor: Optional[Callable] = None, *, prefer_list_index: bool = False
+    parent,
+    key,
+    ctor: Optional[Callable] = None,
+    *,
+    prefer_list_index: bool = False,
+    max_list_length: int = _DEFAULT_PATH_LIMITS.max_list_length,
 ):
     """
     Ensure parent[key] exists; when absent, create by:
@@ -107,6 +169,12 @@ def _ensure_container(
             parent[key] = container
 
     elif isinstance(parent, list) and isinstance(key, int):
+        if key >= max_list_length:
+            raise ResourceLimitError(
+                "auto-created list length",
+                max_list_length,
+                key + 1,
+            )
         while key >= len(parent):
             parent.append(None)
         if parent[key] is None:
@@ -231,7 +299,12 @@ def _is_containerish(x: Any) -> bool:
         return False
     return hasattr(x, "__dict__")
 
-def _ensure_len(seq: list, size: int) -> None:
+def _ensure_len(
+    seq: list,
+    size: int,
+    *,
+    max_list_length: int = _DEFAULT_PATH_LIMITS.max_list_length,
+) -> None:
     """
     Ensure the list has at least the given size. If the list is too short, pad it with None.
 
@@ -248,6 +321,12 @@ def _ensure_len(seq: list, size: int) -> None:
         >>> seq
         [1, 2, None, None, None]
     """
+    if size > max_list_length:
+        raise ResourceLimitError(
+            "auto-created list length",
+            max_list_length,
+            size,
+        )
     missing = size - len(seq)
     if missing > 0:
         seq.extend([None] * missing)
@@ -337,6 +416,8 @@ def _set_by_path(
     path: Path,
     value: Any,
     original: Any,
+    *,
+    limits: Optional[PathLimits] = None,
 ) -> None:
     """
     Place `value` into `res` under the same nested structure as in `original`.
@@ -356,6 +437,8 @@ def _set_by_path(
         >>> _set_by_path({"a": {"b": 1}}, ["a", "b"], 2, {"a": {"b": 1}})
         {"a": {"b": 2}}
     """
+    resolved_limits = _resolve_path_limits(limits)
+    _validate_path_parts(path, resolved_limits, mutating=True)
     cur: Union[Dict[Any, Any], List[Any]] = res
 
     for idx, seg in enumerate(path):
@@ -368,7 +451,11 @@ def _set_by_path(
                 seq = cast(List[Any], cur)
                 # while len(seq) <= seg:
                 #     seq.append(None)
-                _ensure_len(seq, seg + 1)
+                _ensure_len(
+                    seq,
+                    seg + 1,
+                    max_list_length=resolved_limits.max_list_length,
+                )
                 seq[seg] = value
             else:
                 # seg can be str OR tuple (PathKey excludes int here)
@@ -385,7 +472,11 @@ def _set_by_path(
             if not isinstance(cur, list):
                 raise TypeError("Internal error: expected list container")
             seq = cast(List[Any], cur)
-            _ensure_len(seq, seg + 1)
+            _ensure_len(
+                seq,
+                seg + 1,
+                max_list_length=resolved_limits.max_list_length,
+            )
             
             if seq[seg] is None or not isinstance(seq[seg], (dict, list)):
                 # list element becomes list if next is int, else dict
@@ -402,7 +493,11 @@ def _set_by_path(
             cur = cast(Union[Dict[Any, Any], List[Any]], mp[seg])
 
 
-def _parse_path_str(s: str) -> List[Union[str, int, tuple]]:
+def _parse_path_str(
+    s: str,
+    *,
+    limits: Optional[PathLimits] = None,
+) -> List[Union[str, int, tuple]]:
     """Parse a string into a list of path segments.
 
     This function is used to parse strings into the segments used in the path-related functions.
@@ -430,6 +525,13 @@ def _parse_path_str(s: str) -> List[Union[str, int, tuple]]:
         >>> _parse_path_str("a.b[ two ].c")
         ["a", "b", "two", "c"]
     """
+    resolved_limits = _resolve_path_limits(limits)
+    if len(s) > resolved_limits.max_path_length:
+        raise ResourceLimitError(
+            "nested path source length",
+            resolved_limits.max_path_length,
+            len(s),
+        )
     parts: List[Union[str, int, tuple]] = []
     buf: List[str] = []
     i, n = 0, len(s)
@@ -474,9 +576,15 @@ def _parse_path_str(s: str) -> List[Union[str, int, tuple]]:
             buf.append(ch)
         i += 1
     flush()
+    _validate_path_parts(parts, resolved_limits, mutating=False)
     return parts
 
-def _as_parts_any(p: Union[str, List[Union[str, int]], Tuple, Any]) -> List[Union[str, int, tuple]]:
+def _as_parts_any(
+    p: Union[str, List[Union[str, int]], Tuple, Any],
+    *,
+    limits: Optional[PathLimits] = None,
+    mutating: bool = False,
+) -> List[Union[str, int, tuple]]:
     """
     Converts a given path to a list of path parts.
 
@@ -501,13 +609,21 @@ def _as_parts_any(p: Union[str, List[Union[str, int]], Tuple, Any]) -> List[Unio
         >>> _as_parts_any(1)
         [1]
     """
+    resolved_limits = _resolve_path_limits(limits)
     if isinstance(p, list):
+        _validate_path_parts(p, resolved_limits, mutating=mutating)
         return list(p)
     if isinstance(p, tuple):
-        return [p]
+        parts = [p]
+        _validate_path_parts(parts, resolved_limits, mutating=mutating)
+        return parts
     if isinstance(p, str):
-        return _parse_path_str(p)
-    return [p]
+        parts = _parse_path_str(p, limits=resolved_limits)
+        _validate_path_parts(parts, resolved_limits, mutating=mutating)
+        return parts
+    parts = [p]
+    _validate_path_parts(parts, resolved_limits, mutating=mutating)
+    return parts
 
 
 def _flatten(

@@ -1,23 +1,20 @@
 """
 Setup script for UniCoreFW package.
 """
-from unicorefw import (
-    __name__,
-    __version__,
-    __author__,
-    __email__
-)
+from pathlib import Path
+from runpy import run_path
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+ROOT = Path(__file__).resolve().parent
+METADATA = run_path(str(ROOT / "unicorefw" / "_metadata.py"))
+long_description = (ROOT / "README.md").read_text(encoding="utf-8")
 
 setup(
-    name=__name__.lower(),
-    version=__version__,
-    author=__author__,
-    author_email=__email__,
+    name=METADATA["PACKAGE_NAME"],
+    version=METADATA["VERSION"],
+    author=METADATA["AUTHOR"],
+    author_email=METADATA["AUTHOR_EMAIL"],
     description="UniCoreFW is a lodash/underscore-style utility toolkit for Python with both functional and chainable APIs",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -32,15 +29,13 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
-        "License :: OSI Approved :: BSD License",
+        "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    py_modules=["unicorefw"],    
-    package_dir={"": "."},
-    exclude=["examples", "tests", "utils", "benchmark", "docs","dist", 'lab', 'patches'],    
-    packages=find_packages(),
+    license="BSD-3-Clause",
+    packages=find_packages(exclude=("examples", "tests")),
     python_requires=">=3.7",
     install_requires=[],
 )

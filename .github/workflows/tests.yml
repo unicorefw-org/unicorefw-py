@@ -2,90 +2,147 @@ name: UniCoreFW Tests
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master, develop ]
-  workflow_dispatch:  # Allows manual triggering
+    branches: [main, master, develop]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: [ '3.8', '3.9', '3.10', '3.11']
-        
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest pytest-cov
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      shell: bash
-        
-    - name: Perform tests
-      run: |
-        pytest tests/test_array.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-        pytest tests/test_array_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
-    - name: Test object functions
-      run: |
-        pytest tests/test_object.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-        pytest tests/test_object_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-        
-    - name: Test function functions
-      run: |
-        pytest tests/test_function.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-        pytest tests/test_function_pydash.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
 
-    - name: Test utility functions
-      run: |
-        pytest tests/test_utils.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
+      - name: Install test dependencies
+        run: python -m pip install "pytest>=7.4,<9"
 
-    - name: Test security functions
-      run: |
-        pytest tests/test_security.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-    - name: Test template functions
-      run: |
-        pytest tests/test_template.py --cov=unicorefw --cov-report=xml --cov-report=term-missing
-        
-    # - name: Upload coverage to Codecov
-    #   uses: codecov/codecov-action@v3
-    #   with:
-    #     file: ./coverage.xml
-    #     fail_ci_if_error: true
-        
-  lint:
+      - name: Run the complete test suite once
+        run: python -m pytest tests
+
+  coverage:
+    name: Branch coverage ratchet
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 black isort
-        
-    - name: Lint with flake8
-      run: |
-        flake8 unicorefw tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        
-    # - name: Check code formatting with black
-    #   run: |
-    #     black --check unicorefw tests
-        
-    # - name: Check imports with isort
-    #   run: |
-    #     isort --check-only --profile black unicorefw tests
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install coverage dependencies
+        run: >-
+          python -m pip install
+          "pytest>=7.4,<9"
+          "pytest-cov>=4.1,<7"
+          "pandas>=2.0,<3"
+          "openpyxl>=3.1,<4"
+
+      - name: Enforce branch coverage ratchet
+        run: >-
+          python -m pytest tests
+          --cov=unicorefw
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-report=json
+          --cov-fail-under=75
+
+  security-integration:
+    name: Security and optional output integrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install security test dependencies
+        run: >-
+          python -m pip install
+          "pytest>=7.4,<9"
+          "bandit>=1.7,<2"
+          "pip-audit>=2.7,<3"
+          "pandas>=2.0,<3"
+          "openpyxl>=3.1,<4"
+
+      - name: Reject high and medium static security findings
+        run: bandit -r unicorefw -ll
+
+      - name: Audit the installed dependency environment
+        run: python -m pip_audit --strict
+
+      - name: Require spreadsheet integrations
+        run: python -c "import openpyxl, pandas"
+
+      - name: Exercise database and output security boundaries
+        run: >-
+          python -m pytest
+          tests/test_db.py
+          tests/test_db_query_builder.py
+          tests/test_output_security.py
+          tests/test_resource_limits.py
+
+  lint:
+    name: Fatal lint checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install lint dependency
+        run: python -m pip install "flake8>=6,<8"
+
+      - name: Reject syntax and undefined-name errors
+        run: >-
+          flake8 unicorefw tests scripts
+          --count
+          --select=E9,F63,F7,F82
+          --show-source
+          --statistics

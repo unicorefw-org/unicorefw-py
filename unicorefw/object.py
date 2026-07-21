@@ -18,6 +18,7 @@ from typing import (
     Tuple, TypeVar, Union
 )
 from .supporter import (
+    PathLimits,
     _ensure_container,
     _flatten as _flatten_nested,
     _flatten_keys, 
@@ -27,12 +28,13 @@ from .supporter import (
     _is_containerish,
     _ensure_len,
     _as_parts_any,
-    _parse_path,
+    _resolve_path_limits,
     _set_by_path,
     _split_apply_args,
     # _normalize_customizer,
     # _parse_path_str
 )
+from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
 from copy import deepcopy as _copy_deepcopy
 import math
 import re
@@ -193,7 +195,12 @@ def extend(obj: Dict[K, V], *sources: Dict) -> Dict[K, V]:
         obj.update(source)
     return obj
 
-def has(collection: Any, path: Any) -> bool:
+def has(
+    collection: Any,
+    path: Any,
+    *,
+    limits: Optional[PathLimits] = None,
+) -> bool:
     """
     Return True if `path` exists in `collection` (dict, list/tuple/sequence, object).
     Path may be a dotted/bracket string ("a.b[0].c"), a list of segments, an int, etc.
@@ -209,7 +216,7 @@ def has(collection: Any, path: Any) -> bool:
         >>> has({"a": {"b": [None, lambda x: x]}}, "a.b.1")
         True
     """
-    parts = _as_parts_any(path)
+    parts = _as_parts_any(path, limits=limits)
     if not parts:
         return False
 
@@ -1566,7 +1573,7 @@ def invert_by(obj, iteratee=None):
         out.setdefault(key_val, []).append(k)
     return out
 
-def unset(obj, path) -> bool:
+def unset(obj, path, *, limits: Optional[PathLimits] = None) -> bool:
     """
     Removes the property at `path` of `obj`.
 
@@ -1589,7 +1596,7 @@ def unset(obj, path) -> bool:
         >>> unset(obj, "a[0].b.c")
         False
     """
-    parts = _as_parts_any(path)
+    parts = _as_parts_any(path, limits=limits)
     if not parts:
         return False
 
@@ -1631,7 +1638,7 @@ def unset(obj, path) -> bool:
     return False
 
 
-def update(obj, path, updater):
+def update(obj, path, updater, *, limits: Optional[PathLimits] = None):
     """
     Update value at `path` by applying `updater` (or using it as a constant).
 
@@ -1651,9 +1658,9 @@ def update(obj, path, updater):
         >>> update(obj, "a[0].b.c", lambda x: x**2)
         {'a': [{'b': {'c': 49}}]}
     """
-    current = get(obj, path, None)
+    current = get(obj, path, None, limits=limits)
     newval = updater(current)
-    set_(obj, path, newval)
+    set_(obj, path, newval, limits=limits)
     return obj
 
 def find_last_key(obj, predicate=None):
@@ -2305,7 +2312,13 @@ def clone_with(obj: Any, customizer: Callable[..., Any]) -> Any:
     nv = _call(obj)
     return obj if nv is None else nv
 
-def get(obj: Any, path: Union[str, Iterable[Any], Any], default: Any = None) -> Any:
+def get(
+    obj: Any,
+    path: Union[str, Iterable[Any], Any],
+    default: Any = None,
+    *,
+    limits: Optional[PathLimits] = None,
+) -> Any:
     """
     Return the value at `path` from `obj`. If not set, returns `default`.
 
@@ -2323,7 +2336,7 @@ def get(obj: Any, path: Union[str, Iterable[Any], Any], default: Any = None) -> 
         >>> get({"a": {"b": 1}}, "a.c", 42)
         42
     """
-    parts = _as_parts_any(path)
+    parts = _as_parts_any(path, limits=limits)
     for p in parts:
         if isinstance(p, str) and p in _RESTRICTED:
             if isinstance(obj, (dict, list)):
@@ -2538,7 +2551,7 @@ def parse_int(value: Any, radix: Optional[int] = None) -> Optional[int]:
         return None
     
 
-def pick(obj, *keys_to_pick):
+def pick(obj, *keys_to_pick, limits: Optional[PathLimits] = None):
     """
     Creates an object composed of the picked `keys_to_pick` from `obj`.
 
@@ -2573,10 +2586,10 @@ def pick(obj, *keys_to_pick):
 
     # deep paths
     for p in deep_paths:
-        parts = p if isinstance(p, list) else _as_parts_any(p)
-        val = get(obj, parts, _MISSING)
+        parts = _as_parts_any(p, limits=limits)
+        val = get(obj, parts, _MISSING, limits=limits)
         if val is not _MISSING:
-            _set_by_path(out, parts, val, obj)
+            _set_by_path(out, parts, val, obj, limits=limits)
 
     return out
 
@@ -2607,18 +2620,32 @@ def pick_by(obj, predicate=None):
     return {k: v for k, v in _iter_items_like(obj) if predicate(v, k)}
 def to_boolean(
     value: Any,
-    true_patterns: Optional[Iterable[str]] = None,
-    false_patterns: Optional[Iterable[str]] = None,
+    true_patterns: Optional[Iterable[Union[str, UnsafeRegex]]] = None,
+    false_patterns: Optional[Iterable[Union[str, UnsafeRegex]]] = None,
+    *,
+    limits: Optional[RegexLimits] = None,
 ) -> Optional[bool]:
     if isinstance(value, str):
         s = value.strip()
         if true_patterns:
             for p in true_patterns:
-                if re.search(p, s, flags=re.IGNORECASE):
+                pattern = compile_bounded_regex(
+                    p,
+                    s,
+                    flags=re.IGNORECASE,
+                    limits=limits,
+                )
+                if pattern.search(s):
                     return True
         if false_patterns:
             for p in false_patterns:
-                if re.search(p, s, flags=re.IGNORECASE):
+                pattern = compile_bounded_regex(
+                    p,
+                    s,
+                    flags=re.IGNORECASE,
+                    limits=limits,
+                )
+                if pattern.search(s):
                     return False
         if s == "":
             return None
@@ -2705,7 +2732,13 @@ def to_number(value: Any, precision: Optional[int] = 0) -> Optional[float]:
     factor = 10 ** (-precision)
     return math.floor(num / factor) * factor
 
-def set_(obj, path, value):
+def set_(
+    obj,
+    path,
+    value,
+    *,
+    limits: Optional[PathLimits] = None,
+):
     """
     Set `value` at `path`, creating intermediate containers.
     Supports escaped dots and bracket literals via _as_parts_any().
@@ -2723,7 +2756,8 @@ def set_(obj, path, value):
         >>> set_(obj, "a[0].b.c", 8)
         {'a': [{'b': {'c': 8}}]}
     """
-    parts = _as_parts_any(path)
+    resolved_limits = _resolve_path_limits(limits)
+    parts = _as_parts_any(path, limits=resolved_limits, mutating=True)
     if not parts:
         return obj
 
@@ -2731,24 +2765,52 @@ def set_(obj, path, value):
     for i, seg in enumerate(parts[:-1]):
         prefer_list = isinstance(parts[i + 1], int)
         if isinstance(cur, dict):
-            cur, _ = _ensure_container(cur, seg, None, prefer_list_index=prefer_list)
+            cur, _ = _ensure_container(
+                cur,
+                seg,
+                None,
+                prefer_list_index=prefer_list,
+                max_list_length=resolved_limits.max_list_length,
+            )
         elif isinstance(cur, list) and isinstance(seg, int):
-            cur, _ = _ensure_container(cur, seg, None, prefer_list_index=prefer_list)
+            cur, _ = _ensure_container(
+                cur,
+                seg,
+                None,
+                prefer_list_index=prefer_list,
+                max_list_length=resolved_limits.max_list_length,
+            )
         else:
-            cur, _ = _ensure_container(cur, str(seg), None, prefer_list_index=prefer_list)
+            cur, _ = _ensure_container(
+                cur,
+                str(seg),
+                None,
+                prefer_list_index=prefer_list,
+                max_list_length=resolved_limits.max_list_length,
+            )
 
     last = parts[-1]
     if isinstance(cur, dict):
         cur[last] = value
     elif isinstance(cur, list) and isinstance(last, int):
-        while len(cur) <= last:
-            cur.append(None)
+        _ensure_len(
+            cur,
+            last + 1,
+            max_list_length=resolved_limits.max_list_length,
+        )
         cur[last] = value
     else:
         setattr(cur, str(last), value)
     return obj
 
-def set_with(obj, path, value, customizer):
+def set_with(
+    obj,
+    path,
+    value,
+    customizer,
+    *,
+    limits: Optional[PathLimits] = None,
+):
     """
     Set `value` at `path`, creating intermediate containers.
     Supports escaped dots and bracket literals via _as_parts_any().
@@ -2779,14 +2841,15 @@ def set_with(obj, path, value, customizer):
             return []
         return {}
 
-    parts = _parse_path(path) if isinstance(path, str) else ([path] if isinstance(path, int) else list(path))
+    resolved_limits = _resolve_path_limits(limits)
+    parts = _as_parts_any(path, limits=resolved_limits, mutating=True)
+    max_list_length = resolved_limits.max_list_length
     cur = obj
     for i, seg in enumerate(parts):
         last = (i == len(parts) - 1)
         if last:
             if isinstance(cur, list) and isinstance(seg, int):
-                while len(cur) <= seg:
-                    cur.append(None)
+                _ensure_len(cur, seg + 1, max_list_length=max_list_length)
                 cur[seg] = value
             elif isinstance(cur, dict):
                 cur[seg] = value
@@ -2796,8 +2859,7 @@ def set_with(obj, path, value, customizer):
 
         # Not last: descend, creating with customizer only when needed
         if isinstance(cur, list) and isinstance(seg, int):
-            while len(cur) <= seg:
-                cur.append(None)
+            _ensure_len(cur, seg + 1, max_list_length=max_list_length)
             child = cur[seg]
             if not _is_containerish(child):
                 child = make()
@@ -2819,7 +2881,14 @@ def set_with(obj, path, value, customizer):
 
     return obj
 
-def update_with(obj, path, func, customizer):
+def update_with(
+    obj,
+    path,
+    func,
+    customizer,
+    *,
+    limits: Optional[PathLimits] = None,
+):
     """
     Update value at `path` by applying `func` (or using it as a constant).
 
@@ -2841,7 +2910,7 @@ def update_with(obj, path, func, customizer):
         >>> update_with(obj, "a[0].b.c", lambda x: x**2, dict)
         {'a': [{'b': {'c': 49}}]}
     """
-    current = get(obj, path)
+    current = get(obj, path, limits=limits)
     if callable(func):
         try:
             new_val = func(current)
@@ -2849,7 +2918,7 @@ def update_with(obj, path, func, customizer):
             new_val = func()
     else:
         new_val = func
-    return set_with(obj, path, new_val, customizer)
+    return set_with(obj, path, new_val, customizer, limits=limits)
 
 def apply_if(*args, **kwargs):
     """Apply a function to a *value* only if `predicate(value)` is True.

@@ -14,9 +14,17 @@ You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
+import json
+import logging
+import math
+import os
+import stat
+import sys
 import threading
 import time
-from typing import Any, Callable, Type, Union, Optional, Tuple
+from collections import deque
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional, Tuple, Type, Union
 
 
 class SecurityError(Exception):
@@ -41,6 +49,109 @@ class SanitizationError(SecurityError):
     """Raised when data sanitization fails."""
 
     pass
+
+
+class ResourceLimitError(SecurityError):
+    """Raised before caller-controlled work exceeds a configured resource budget."""
+
+    def __init__(
+        self,
+        resource: str,
+        limit: Union[int, float],
+        observed: Optional[Union[int, float]] = None,
+    ):
+        self.resource = resource
+        self.limit = limit
+        self.observed = observed
+        message = f"{resource} exceeds the configured limit of {limit}"
+        if observed is not None:
+            message += f" (observed {observed})"
+        super().__init__(message)
+
+
+def _validate_resource_limit(value: Any, name: str, hard_maximum: int) -> int:
+    """Validate one positive integer limit against a library safety ceiling."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise InputValidationError(f"{name} must be a positive integer")
+    if value > hard_maximum:
+        raise InputValidationError(
+            f"{name} cannot exceed the hard safety maximum of {hard_maximum}"
+        )
+    return value
+
+
+def _validate_resource_ratio(
+    value: Any,
+    name: str,
+    hard_maximum: float,
+) -> float:
+    """Validate one ratio limit against a library safety ceiling."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise InputValidationError(
+            f"{name} must be a number greater than or equal to 1"
+        )
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value) or numeric_value < 1:
+        raise InputValidationError(
+            f"{name} must be a finite number greater than or equal to 1"
+        )
+    if numeric_value > hard_maximum:
+        raise InputValidationError(
+            f"{name} cannot exceed the hard safety maximum of {hard_maximum:g}"
+        )
+    return numeric_value
+
+
+def _validate_resource_duration(
+    value: Any,
+    name: str,
+    hard_maximum: float,
+    *,
+    allow_zero: bool = False,
+) -> float:
+    """Validate a finite duration against a library safety ceiling."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise InputValidationError(f"{name} must be a finite number")
+    numeric_value = float(value)
+    minimum = 0 if allow_zero else 0.0
+    if not math.isfinite(numeric_value) or (
+        numeric_value < minimum if allow_zero else numeric_value <= minimum
+    ):
+        qualifier = "non-negative" if allow_zero else "positive"
+        raise InputValidationError(f"{name} must be a finite {qualifier} number")
+    if numeric_value > hard_maximum:
+        raise InputValidationError(
+            f"{name} cannot exceed the hard safety maximum of {hard_maximum:g}"
+        )
+    return numeric_value
+
+
+def _estimate_resource_weight(value: Any, limit: int) -> int:
+    """Estimate built-in container weight and stop after crossing ``limit``."""
+    total = 0
+    pending = [value]
+    seen = set()
+    container_types = (dict, list, tuple, set, frozenset, deque)
+
+    while pending:
+        current = pending.pop()
+        if isinstance(current, container_types):
+            identity = id(current)
+            if identity in seen:
+                continue
+            seen.add(identity)
+
+        total += sys.getsizeof(current)
+        if total > limit:
+            return total
+
+        if isinstance(current, dict):
+            pending.extend(current.keys())
+            pending.extend(current.values())
+        elif isinstance(current, (list, tuple, set, frozenset, deque)):
+            pending.extend(current)
+
+    return total
 
 
 class RateLimiter:
@@ -86,6 +197,48 @@ class RateLimiter:
         pass
 
 
+class _SecureAppendFileHandler(logging.Handler):
+    """Append UTF-8 log records without following symbolic links."""
+
+    terminator = "\n"
+
+    def __init__(self, log_file: str):
+        super().__init__(level=logging.INFO)
+        self.log_file = os.path.abspath(os.fspath(log_file))
+        self.setFormatter(logging.Formatter("%(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        encoded_record = (self.format(record) + self.terminator).encode("utf-8")
+        flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY
+        if hasattr(os, "O_BINARY"):
+            flags |= os.O_BINARY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW  # pyright: ignore[reportAttributeAccessIssue]
+
+        descriptor = -1
+        try:
+            descriptor = os.open(self.log_file, flags, 0o600)
+            file_status = os.fstat(descriptor)
+            if not stat.S_ISREG(file_status.st_mode):
+                raise SecurityError("Audit log destination must be a regular file")
+            if hasattr(os, "fchmod"):
+                os.fchmod(
+                    descriptor, 0o600
+                )  # pyright: ignore[reportAttributeAccessIssue]
+
+            remaining = memoryview(encoded_record)
+            while remaining:
+                written = os.write(descriptor, remaining)
+                if written <= 0:
+                    raise OSError("Audit log write made no progress")
+                remaining = remaining[written:]
+        except OSError as exc:
+            raise SecurityError("Unable to append the audit event securely") from exc
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+
+
 class AuditLogger:
     """
     Secure audit logging implementation.
@@ -93,30 +246,82 @@ class AuditLogger:
     This class provides a thread-safe way to log security-related events.
     """
 
-    def __init__(self, log_file: str = "unicore_audit.log"):
+    def __init__(
+        self,
+        log_file: str = "unicore_audit.log",
+        logger: Optional[logging.Logger] = None,
+    ):
         """
         Initialize an AuditLogger.
 
         Args:
             log_file: Path to the log file
+            logger: Existing standard-library logger. When supplied, it owns
+                routing and log_file is not used.
         """
-        self.log_file = log_file
         self._lock = threading.Lock()
+        self._owned_handler: Optional[_SecureAppendFileHandler] = None
 
-    def log(self, event_type: str, details: str):
+        if logger is not None:
+            if not isinstance(logger, logging.Logger):
+                raise InputValidationError("logger must be a logging.Logger")
+            self._logger = logger
+            self.log_file = None
+            return
+
+        self.log_file = os.path.abspath(os.fspath(log_file))
+        self._logger = logging.getLogger(f"unicorefw.audit.{id(self)}")
+        self._logger.setLevel(logging.INFO)
+        self._logger.propagate = False
+        self._owned_handler = _SecureAppendFileHandler(self.log_file)
+        self._logger.addHandler(self._owned_handler)
+
+    def log(self, event_type: str, details: Any) -> None:
         """
         Securely log an event with timestamp and details.
 
         Args:
             event_type: Type of event (e.g., "LOGIN", "ACCESS_DENIED")
-            details: Details of the event
+            details: JSON-serializable event details. Other values are rendered
+                with their string representation.
         """
-        with self._lock:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_entry = f"{timestamp} - {event_type}: {details}\n"
+        if not isinstance(event_type, str) or not event_type.strip():
+            raise InputValidationError("event_type must be non-empty text")
+        if "\x00" in event_type:
+            raise InputValidationError("event_type cannot contain null bytes")
 
-            with open(self.log_file, "a") as f:
-                f.write(log_entry)
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_type": event_type,
+            "details": details,
+            "message": f"{event_type}: {details}",
+        }
+        serialized_event = json.dumps(
+            event,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            default=str,
+        )
+        with self._lock:
+            self._logger.info(
+                serialized_event,
+                extra={"audit_event": event},
+            )
+
+    def close(self) -> None:
+        """Detach and close the internally owned file handler."""
+        with self._lock:
+            if self._owned_handler is None:
+                return
+            self._logger.removeHandler(self._owned_handler)
+            self._owned_handler.close()
+            self._owned_handler = None
+
+    def __enter__(self) -> "AuditLogger":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
 
 
 def validate_type(
@@ -165,7 +370,9 @@ def validate_callable(func: Any, param_name: str = "parameter") -> Callable:
     # Check if function is bound method or regular function
     if hasattr(func, "__self__"):
         # Bound method - validate the instance
-        validate_type(func.__self__, (object,), f"{param_name}.__self__")
+        validate_type(
+            func.__self__, (object,), f"{param_name}.__self__"
+        )  # pyright: ignore[reportFunctionMemberAccess]
 
     return func
 

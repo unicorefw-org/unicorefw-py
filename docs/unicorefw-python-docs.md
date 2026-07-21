@@ -95,14 +95,16 @@ with limiter:
 ### Audit Logging
 
 ```python
-from unicorefw import AuditLogger
+from unicorefw.security import AuditLogger
 
-# Create an audit logger
-logger = AuditLogger(log_file="app_audit.log")
-
-# Log security events
-logger.log("LOGIN", "User johndoe logged in successfully")
+with AuditLogger(log_file="app_audit.jsonl") as logger:
+    logger.log("LOGIN", {"user_id": "42", "result": "success"})
 ```
+
+The file sink writes one UTF-8 JSON object per event, uses owner-only
+permissions on POSIX, and refuses symbolic-link destinations where supported.
+Never include passwords, tokens, session identifiers, or encryption keys in
+audit details.
 
 ## Core API Reference
 
@@ -287,8 +289,14 @@ throttled()  # Ignored if called within 1000ms
 def on_resize():
     print("Resize handler executed")
 
-debounced = UniCoreFW.debounce(on_resize, 200)  # Wait for 200ms of inactivity
+debounced = UniCoreFW.debounce(
+    on_resize,
+    200,
+    max_pending_timers=8,
+)  # Wait for 200ms of inactivity
 # Multiple rapid calls will only execute once after 200ms
+# Release a scheduled callback when the owner shuts down.
+debounced.cancel()
 
 # Create a function that only executes once
 def initialize():
@@ -410,7 +418,7 @@ def fibonacci(n):
 
 result = fibonacci(20)  # Fast computation due to memoization
 
-# Template function
+# Plain-text template function; values are not HTML escaped.
 template_str = "Hello, <%= name %>! You are <%= age %> years old."
 context = {"name": "John", "age": 30}
 result = UniCoreFW.template(template_str, context)
@@ -631,6 +639,10 @@ rendered = uc.UniCoreFW.template(template, context)
 print(rendered)
 ```
 
+For HTML text nodes, import `html_template` from `unicorefw.template`. It escapes
+untrusted values and rejects expressions inside tags, attributes, scripts, and
+styles. Both renderers require trusted template source.
+
 ## Security Best Practices
 
 When using UniCoreFW, follow these security best practices:
@@ -645,7 +657,8 @@ When using UniCoreFW, follow these security best practices:
    ```python
    sanitized = sanitize_string(user_input, max_length=100, allowed_chars="a-zA-Z0-9")
    ```
-3. **Apply rate limiting**: Use RateLimiter for protection against DoS attacks
+3. **Apply local rate limiting**: `RateLimiter` limits one Python process only;
+   use an atomic shared backend at service boundaries
 
    ```python
    with RateLimiter(max_calls=100, time_window=60):
@@ -654,22 +667,90 @@ When using UniCoreFW, follow these security best practices:
 4. **Maintain audit logs**: Use AuditLogger to track security events
 
    ```python
-   logger = AuditLogger()
-   logger.log("ACCESS", f"User {user_id} accessed resource {resource_id}")
+   with AuditLogger() as logger:
+       logger.log("ACCESS", {"user_id": user_id, "resource_id": resource_id})
    ```
-5. **Use secure random functions**: When randomness is needed, use the secure functions provided
+5. **Use cryptographic randomness for security decisions**: Collection sampling
+   and shuffling are not token, password, or key generators
+6. **Keep template source trusted**: Validation and callable checks do not make
+   arbitrary Python objects or attacker-authored templates safe
 
    ```python
-   # Use shuffle with secure randomness
-   shuffled = UniCoreFW.shuffle(items)
-   ```
-6. **Be careful with dynamic evaluation**: The template function has safeguards, but be cautious with dynamic content
+   from unicorefw.template import html_template
 
-   ```python
-   # Avoid user-provided templates when possible
-   template = "<%= user.name %>"  # Safe
-   # user_template = user_input  # Potentially unsafe
+   rendered = html_template("<p><%= display_name %></p>", {
+       "display_name": user_input,
+   })
    ```
+
+## Resource Budgets
+
+UniCoreFW raises `ResourceLimitError` when caller-controlled work reaches a
+runtime budget. It raises `InputValidationError` when application code supplies
+an invalid limit or exceeds a hard ceiling.
+
+```python
+from unicorefw.security import ResourceLimitError
+from unicorefw.template import TemplateLimits, html_template
+
+limits = TemplateLimits(
+    max_tokens=200,
+    max_nesting_depth=8,
+    max_output_length=100_000,
+)
+
+try:
+    page = html_template("<p><%= value %></p>", context, limits=limits)
+except ResourceLimitError as error:
+    audit_logger.log("INPUT_LIMIT", {
+        "resource": error.resource,
+        "limit": error.limit,
+    })
+```
+
+Database imports accept `max_bytes`, `max_rows`, and `max_columns`. CSV import
+counts bytes during decoding and rolls back the transaction after a limit error.
+Excel import also checks ZIP member count, expanded bytes, and expansion ratio.
+Set these values in trusted application configuration.
+
+`memoize()` uses a thread-safe, process-local LRU with defaults of 256 entries,
+16 MiB estimated key/result weight, and a 300-second monotonic TTL. Its hard
+ceilings are 100,000 entries, 256 MiB, and seven days. Cached mutable return
+values retain the existing identity semantics; callers must not mutate them if
+other callers expect an unchanged value.
+
+```python
+bounded_lookup = UniCoreFW.memoize(
+    lookup,
+    max_entries=128,
+    max_weight_bytes=8 * 1024 * 1024,
+    ttl_seconds=60,
+)
+bounded_lookup.cache_clear()
+usage = bounded_lookup.cache_info()
+```
+
+`CacheManager` applies the same default entry, weight, and TTL budgets to query
+results, uses isolated copies, and evicts least-recently-used entries. Call
+`clear()` after writes that may invalidate results; invalidation is not
+automatic.
+
+Nested object paths default to 4,096 source characters, 64 segments, and 10,000
+auto-created list items. Supply a trusted `PathLimits` instance to lower these
+budgets. Mutating paths are validated before list or container creation.
+
+Caller-supplied regular expressions default to 10,000 input characters, 512
+pattern characters, 64 groups, 64 quantifiers, and a finite repeat bound of
+100,000. Python's standard regex engine has no portable timeout, so the safe
+policy rejects backreferences, special groups, nested repetition, adjacent
+repetition, and repeated ambiguous groups. `unsafe_raw_regex()` is only for a
+reviewed, developer-controlled expression; it bypasses structural checks but
+does not bypass input and pattern length limits.
+
+Debounced functions default to eight pending timer threads per wrapper and
+provide `cancel()` and `pending_timer_count()`. `defer()` shares a process-wide
+1,024-timer budget. Limit exhaustion raises `ResourceLimitError`; the primary
+`debounce()` helper retains its existing callback-exception suppression behavior.
 
 ## Performance Considerations
 

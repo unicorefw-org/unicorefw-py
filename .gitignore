@@ -2,3 +2,8 @@ src/unicorefw.egg-info
 dist
 build
 */__pycache__/*
+.coverage
+.coverage.*
+coverage.json
+coverage.xml
+htmlcov/

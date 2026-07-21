@@ -20,6 +20,7 @@ from .supporter import (
     _parse_js_regex,
     _to_str
 )
+from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
 import math
 import re
 import string as _st
@@ -126,7 +127,13 @@ def replace_all(string: str, find: str, replacement: str) -> str:
     return string.replace(find, replacement)
 
 
-def regex_find_all(string: str, pattern: str, flags: int = 0) -> List[str]:
+def regex_find_all(
+    string: str,
+    pattern: Union[str, UnsafeRegex],
+    flags: int = 0,
+    *,
+    limits: Optional[RegexLimits] = None,
+) -> List[str]:
     """
     Find all non-overlapping matches of a regex pattern in the given string.
 
@@ -142,10 +149,17 @@ def regex_find_all(string: str, pattern: str, flags: int = 0) -> List[str]:
         >>> regex_find_all("abc123xyz456", r"\\d+")
         ["123", "456"]
     """
-    return re.findall(pattern, string, flags=flags)
+    compiled = compile_bounded_regex(pattern, string, flags=flags, limits=limits)
+    return compiled.findall(string)
 
 
-def regex_test(string: str, pattern: str, flags: int = 0) -> bool:
+def regex_test(
+    string: str,
+    pattern: Union[str, UnsafeRegex],
+    flags: int = 0,
+    *,
+    limits: Optional[RegexLimits] = None,
+) -> bool:
     """
     Test if the string contains at least one match of the regex pattern.
 
@@ -161,14 +175,17 @@ def regex_test(string: str, pattern: str, flags: int = 0) -> bool:
         >>> regex_test("Hello123", r"\\d+", 0)
         True
     """
-    return bool(re.search(pattern, string, flags=flags))
+    compiled = compile_bounded_regex(pattern, string, flags=flags, limits=limits)
+    return bool(compiled.search(string))
 
 
 def regex_replace(
     string: str,
-    pattern: str,
+    pattern: Union[str, UnsafeRegex],
     replacement: Union[str, Callable[[re.Match], str]],
-    flags: int = 0
+    flags: int = 0,
+    *,
+    limits: Optional[RegexLimits] = None,
 ) -> str:
     """
     Replace all matches of the given regex pattern in 'string' with 'replacement'.
@@ -191,14 +208,17 @@ def regex_replace(
         >>> regex_replace("abc123", r"[a-z]", |m| m.as_str().to_uppercase().into(), 0)
         "ABC123"
     """
-    return re.sub(pattern, replacement, string, flags=flags)
+    compiled = compile_bounded_regex(pattern, string, flags=flags, limits=limits)
+    return compiled.sub(replacement, string)
 
 
 def regex_extract(
     string: str,
-    pattern: str,
+    pattern: Union[str, UnsafeRegex],
     group: int = 0,
-    flags: int = 0
+    flags: int = 0,
+    *,
+    limits: Optional[RegexLimits] = None,
 ) -> Optional[str]:
     """
     Find the first match of 'pattern' in 'string' and return the specified capture group.
@@ -216,15 +236,18 @@ def regex_extract(
         >>> regex_extract("Name: Alice, Age: 30", r"Name:\\s+(\\w+)", 1, 0)
         "Alice"
     """
-    match = re.search(pattern, string, flags=flags)
+    compiled = compile_bounded_regex(pattern, string, flags=flags, limits=limits)
+    match = compiled.search(string)
     return match.group(group) if match else None
 
 
 def regex_extract_all(
     string: str,
-    pattern: str,
+    pattern: Union[str, UnsafeRegex],
     group: int = 0,
-    flags: int = 0
+    flags: int = 0,
+    *,
+    limits: Optional[RegexLimits] = None,
 ) -> List[str]:
     """
     Find all non-overlapping matches of 'pattern' in 'string' and return the specified capture group.
@@ -242,7 +265,8 @@ def regex_extract_all(
         >>> regex_extract_all("Name: Alice, Name: Bob, Name: Charlie", r"Name:\\s+(\\w+)", 1)
         ["Alice", "Bob", "Charlie"]
     """
-    matches = re.finditer(pattern, string, flags=flags)
+    compiled = compile_bounded_regex(pattern, string, flags=flags, limits=limits)
+    matches = compiled.finditer(string)
     return [m.group(group) for m in matches]
 
 def strip_html_tags(string: str) -> str:
@@ -1606,7 +1630,12 @@ def lines(string: Optional[str]) -> List[str]:
     return parts
 
 
-def words(string: Optional[str], pattern: Optional[str] = None) -> List[str]:
+def words(
+    string: Optional[str],
+    pattern: Optional[Union[str, UnsafeRegex]] = None,
+    *,
+    limits: Optional[RegexLimits] = None,
+) -> List[str]:
     """
     Extract “words” (letter‐runs and number‐runs) from a string, including camelCase splits.
 
@@ -1642,8 +1671,8 @@ def words(string: Optional[str], pattern: Optional[str] = None) -> List[str]:
         return []
     
     if pattern is not None:
-        _pattern = re.compile(pattern)
-        return [w for w in re.split(_pattern, string) if w]
+        _pattern = compile_bounded_regex(pattern, string, limits=limits)
+        return [w for w in _pattern.split(string) if w]
 
     # Match uppercase acronyms, camelCase segments, or numeric runs:
     _pattern = re.compile(r'''
