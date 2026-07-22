@@ -18,6 +18,8 @@ impact, and verification evidence in this file.
 - Added bounded regex, nested-path, memoization, query-cache, debounce, and
   deferred-timer policies with hard safety ceilings.
 - Replaced password-based release publication with gated PyPI trusted publishing.
+- Pinned the audited Python 3.10+ CI and release toolchain to patched pip,
+  pytest, and setuptools versions.
 
 ### Changed
 
@@ -464,6 +466,49 @@ Verification:
   79.15% and branch coverage reached 69.61%.
 - The CI coverage threshold increased from 75% to 76%.
 
+#### 2026-07-21: Patched CI and build toolchain
+
+Status: Complete
+
+- Raised Python 3.10+ test jobs from pytest 8.4.2 to pytest 9.0.3 or later,
+  addressing PYSEC-2026-1845.
+- Raised the Python 3.10+ build backend and security job to setuptools 83.0.0
+  or later, addressing PYSEC-2026-3447.
+- Added a pip 26.1.2 upgrade before dependency installation in every Python
+  3.10+ test, lint, coverage, security, and release-build job. This also keeps
+  the installer itself inside the strict dependency audit.
+- Kept Python 3.8 and 3.9 on compatible pytest, pip, and setuptools lines by
+  using Python-version markers. Package runtime support and public imports are
+  unchanged.
+- Directed every CI pytest invocation to a job-owned base temporary directory.
+  This avoids the shared `/tmp/pytest-of-{user}` path in legacy pytest releases
+  that cannot install the Python 3.10+ fix.
+- Updated the coverage plugin to pytest-cov 7.x and raised the verified branch
+  coverage ratchet from 76% to 77%.
+- Added workflow regression coverage for the patched versions, compatibility
+  markers, release-job installer upgrade, private pytest base directory, and
+  strict audit command.
+
+Compatibility boundary:
+
+- pytest 9.0.3, setuptools 83.0.0, and pip 26.1.2 require Python 3.10 or later.
+  Python 3.8 and 3.9 therefore retain their existing compatible tooling. Their
+  CI runs use an isolated base temporary directory as a defense for the pytest
+  issue; a fully patched legacy dependency set requires an upstream backport or
+  removal of those interpreter jobs.
+
+Verification:
+
+- `python -m pip_audit --strict` against the exact Python 3.11 security-job
+  environment reported no known vulnerabilities.
+- Python 3.11 with pytest 9.1.1: 1,434 tests passed in 20.25 seconds.
+- The exact pytest-cov 7.1.0 branch-coverage command passed 1,434 tests in 56.92
+  seconds and measured 77.39% combined coverage.
+- Python 3.8 with pytest 8.4.2: 1,432 tests passed and 2 optional tests skipped
+  in 25.09 seconds.
+- Bandit 1.9.4 reported no medium or high findings. Workflow YAML parsing,
+  release-script tests, and `git diff --check` passed.
+
 ### Current optimization status
 
 | Phase | Scope | Status | Exit evidence |
@@ -477,13 +522,13 @@ Verification:
 
 #### Audit limitations
 
-- Local tests did not exercise PostgreSQL, MySQL, MongoDB, Redis, pandas, or
-  openpyxl. The required CI output-integration job installs pandas and openpyxl;
-  service-backed database jobs remain pending.
+- Local tests now exercise pandas and openpyxl. PostgreSQL, MySQL, MongoDB, and
+  Redis still require service-backed integration jobs.
 - Installed SQLAlchemy and cryptography packages allowed import-boundary and
   ORM-shape inspection without service-backed integration testing.
-- The audit used no network access, so it did not query live vulnerability
-  databases or verify current third-party action releases.
+- The initial repository audit used no network access. The patched Python 3.11
+  CI environment later passed a live strict dependency audit; third-party
+  action release verification remains a separate maintenance task.
 - Import and algorithm measurements used local one-shot samples. Phase 0 must
   replace them with isolated, repeated benchmarks.
 - The repository contains no product or documentation-site UI source. The audit

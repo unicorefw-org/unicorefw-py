@@ -42,6 +42,9 @@ jobs:
       - name: Verify tag, metadata, and changelog agreement
         run: python scripts/verify_release.py "${{ github.ref_name }}"
 
+      - name: Upgrade the package installer
+        run: python -m pip install "pip>=26.1.2,<27"
+
       - name: Install isolated build verification tools
         run: python -m pip install "build==1.5.0" "twine==6.2.0"
 

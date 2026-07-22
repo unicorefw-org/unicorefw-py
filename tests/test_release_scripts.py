@@ -141,12 +141,37 @@ def test_test_workflow_enforces_branch_coverage_ratchet():
     workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(
         encoding="utf-8"
     )
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     threshold_match = re.search(r"--cov-fail-under=(\d+(?:\.\d+)?)", workflow)
+    config_match = re.search(r"fail_under\s*=\s*(\d+(?:\.\d+)?)", pyproject)
 
     assert "name: Branch coverage ratchet" in workflow
     assert "--cov-branch" in workflow
     assert "--cov-report=term-missing" in workflow
     assert "--cov-report=xml" in workflow
     assert "--cov-report=json" in workflow
+    assert "--basetemp=" in workflow
     assert threshold_match is not None
-    assert 76 <= float(threshold_match.group(1)) <= 100
+    assert config_match is not None
+    assert 77 <= float(threshold_match.group(1)) <= 100
+    assert float(config_match.group(1)) == float(threshold_match.group(1))
+
+
+def test_ci_uses_fixed_tooling_without_dropping_legacy_python_support():
+    workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(
+        encoding="utf-8"
+    )
+    release_workflow = (
+        ROOT / ".github" / "workflows" / "release.yml"
+    ).read_text(encoding="utf-8")
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"pip>=26.1.2,<27; python_version >= \'3.10\'"' in workflow
+    assert workflow.count('"pip>=26.1.2,<27"') == 3
+    assert '"pip>=26.1.2,<27"' in release_workflow
+    assert '"pytest>=7.4,<9; python_version < \'3.10\'"' in workflow
+    assert '"pytest>=9.0.3,<10; python_version >= \'3.10\'"' in workflow
+    assert '"setuptools>=83,<84"' in workflow
+    assert "python -m pip_audit --strict" in workflow
+    assert "setuptools>=61,<83; python_version < '3.10'" in pyproject
+    assert "setuptools>=83,<84; python_version >= '3.10'" in pyproject
