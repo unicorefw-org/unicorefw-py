@@ -8,6 +8,24 @@ impact, and verification evidence in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected the immutable `pypa/gh-action-pypi-publish` v1.14.0 reference. The
+  previous SHA had no matching GHCR image, so the publish job stopped before
+  requesting a PyPI trusted-publishing token or uploading an artifact.
+
+Compatibility impact: None. The release job retains OIDC authentication,
+provenance attestations, least-privilege permissions, and the verified-artifact
+boundary.
+
+Verification:
+
+- Confirmed the signed v1.14.0 release commit and its GHCR image tag. PyPA
+  published the image as digest
+  `sha256:72bce99a396e7ed0635f3fcc0f0a7052314a68c00c1999f5d0f9454b18cd2e40`.
+- Added a regression assertion for the full 40-character release commit.
+- Parsed the workflow YAML and passed the release-script suite.
+
 ## [1.1.5] - 2026-07-22
 
 ### Security

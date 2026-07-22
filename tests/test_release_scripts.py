@@ -135,6 +135,11 @@ def test_release_workflow_has_no_floating_action_or_password_publish():
     assert "id-token: write" in workflow
     assert "needs: quality" in workflow
     assert "needs: build" in workflow
+    assert (
+        "pypa/gh-action-pypi-publish@"
+        "cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0"
+        in workflow
+    )
 
 
 def test_test_workflow_enforces_branch_coverage_ratchet():
