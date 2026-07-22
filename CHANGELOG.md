@@ -8,6 +8,8 @@ impact, and verification evidence in this file.
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-07-22
+
 ### Security
 
 - Replaced unsafe SQL dump literals with SQLite-native quoting and staged restore.
@@ -536,9 +538,10 @@ Verification:
 
 #### Next action
 
-- Continue the coverage campaign from the 76% ratchet, prioritizing crypto,
+- Continue the coverage campaign from the 77% ratchet, prioritizing crypto,
   database error paths, and maintained optional integrations.
 - Keep publication paused until maintainers rehearse the protected PyPI OIDC
   and provenance path.
 
-[Unreleased]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.4...v1.1.5
