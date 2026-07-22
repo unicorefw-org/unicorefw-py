@@ -4,7 +4,9 @@ MANIFEST.in
 README.md
 pyproject.toml
 setup.py
+docs/masterplan.md
 docs/unicorefw-python-docs.md
+scripts/__init__.py
 scripts/build_release_metadata.py
 scripts/verify_release.py
 scripts/verify_wheel.py

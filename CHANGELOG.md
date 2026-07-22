@@ -419,12 +419,19 @@ Status: Complete
 - Preserved deterministic LF output for `SHA256SUMS` on Windows and POSIX.
 - Added a regression test that disables `Path.write_text()` during metadata
   generation and checks the checksum file's raw line endings.
+- Added `scripts/__init__.py` so an installed third-party package named
+  `scripts` cannot shadow the repository's release helpers on Python 3.8.
+- Excluded the repository release-helper package from wheel discovery and made
+  wheel inspection reject release tooling if packaging configuration regresses.
 
 Verification:
 
-- Release-script suite on Python 3.10: 8 passed.
-- Full local suite: 1,427 passed and 2 optional Excel tests skipped in 13.72
+- Release-script suite on Python 3.8: 9 passed.
+- Full Python 3.8 suite: 1,428 passed and 2 optional Excel tests skipped in
+  25.30 seconds. The Python 3.10 suite produced the same result in 21.52
   seconds.
+- An isolated source and wheel build passed. Python 3.8 wheel inspection
+  confirmed that the wheel excludes repository release tooling.
 - Python 3.11 compiled the release metadata script. Fatal Flake8 passed for the
   changed script and test.
 

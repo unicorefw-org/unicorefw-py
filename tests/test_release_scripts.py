@@ -106,6 +106,15 @@ def test_wheel_inspector_rejects_path_traversal(tmp_path: Path):
         inspect_wheel(wheel_path)
 
 
+def test_wheel_inspector_rejects_repository_release_tooling(tmp_path: Path):
+    wheel_path = tmp_path / "tooling.whl"
+    with zipfile.ZipFile(wheel_path, "w") as archive:
+        archive.writestr("scripts/__init__.py", "")
+
+    with pytest.raises(SystemExit, match="release tooling"):
+        inspect_wheel(wheel_path)
+
+
 def test_release_workflow_has_no_floating_action_or_password_publish():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"

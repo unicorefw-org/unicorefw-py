@@ -35,7 +35,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     license="BSD-3-Clause",
-    packages=find_packages(exclude=("examples", "tests")),
+    packages=find_packages(exclude=("examples", "tests", "scripts", "scripts.*")),
     python_requires=">=3.7",
     install_requires=[],
 )
