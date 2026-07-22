@@ -974,7 +974,8 @@ class Database:
 
             # Postgres: if user provides id explicitly, do not call LASTVAL() (it can be undefined).
             if self.engine == "postgres" and "id" in data:
-                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"
+                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"  # nosec B608
                 self.execute(query, tuple(data[k] for k in keys))
                 try:
                     return int(data["id"])  # type: ignore[arg-type]
@@ -983,9 +984,11 @@ class Database:
 
             if self.engine == "postgres":
                 # Best-effort for common PK name "id" on Postgres.
-                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders}) RETURNING id"
+                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders}) RETURNING id"  # nosec B608
             else:
-                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"
+                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"  # nosec B608
 
             self.execute(query, tuple(data[k] for k in keys))
 
@@ -1031,7 +1034,8 @@ class Database:
                                    for k in data.keys()])
             where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
                                         for k in where.keys()])
-            query = f"UPDATE {qtable} SET {set_clause} WHERE {where_clause}"
+            # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+            query = f"UPDATE {qtable} SET {set_clause} WHERE {where_clause}"  # nosec B608
             
             params = tuple(list(data.values()) + list(where.values()))
             self.execute(query, params)
@@ -1063,7 +1067,8 @@ class Database:
             qtable = _qtable(self.engine, table)
             where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
                                         for k in where.keys()])
-            query = f"DELETE FROM {qtable} WHERE {where_clause}"
+            # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+            query = f"DELETE FROM {qtable} WHERE {where_clause}"  # nosec B608
             
             self.execute(query, tuple(where.values()))
             return self.cursor.rowcount  # type: ignore
@@ -1393,10 +1398,11 @@ class Migration:
         """
         # Check if already applied
         placeholder = "?" if self.db.engine == "sqlite" else "%s"
-        existing = self.db.fetch_one(
-            f"SELECT * FROM {_qtable(self.db.engine, '_migrations')} WHERE {_qident(self.db.engine, 'version')} = {placeholder}",
-            (version,)
-        )
+        migration_table = _qtable(self.db.engine, "_migrations")
+        version_column = _qident(self.db.engine, "version")
+        # Bandit B608 review: both identifiers are fixed constants; version stays bound.
+        query = f"SELECT * FROM {migration_table} WHERE {version_column} = {placeholder}"  # nosec B608
+        existing = self.db.fetch_one(query, (version,))
         
         if existing:
             return False
@@ -1472,7 +1478,8 @@ class DataExporter:
             raise ExportError(
                 "Bound parameters require an explicit unsafe_raw_sql() query"
             )
-        return self.db.fetch_all(f"SELECT * FROM {qtable}")
+        # Bandit B608 review: qtable is allowlisted and quoted by _qtable().
+        return self.db.fetch_all(f"SELECT * FROM {qtable}")  # nosec B608
 
     def to_json(
         self,
@@ -1642,8 +1649,9 @@ class DataExporter:
                 if not schema or not schema["sql"]:
                     raise ExportError(f"SQLite table does not exist: {table!r}")
 
+                # Bandit B608 review: qtable is allowlisted and quoted by _qtable().
                 metadata_cursor = snapshot.execute(
-                    f"SELECT * FROM {qtable} LIMIT 0"
+                    f"SELECT * FROM {qtable} LIMIT 0"  # nosec B608
                 )
                 column_names = [
                     item[0] for item in metadata_cursor.description or ()
@@ -1660,8 +1668,9 @@ class DataExporter:
                     f"CAST(quote({_qident('sqlite', name)}) AS TEXT)"
                     for name in column_names
                 )
+                # Bandit B608 review: table and column identifiers are allowlisted and quoted.
                 rows = snapshot.execute(
-                    f"SELECT {quoted_values} FROM {qtable}"
+                    f"SELECT {quoted_values} FROM {qtable}"  # nosec B608
                 )
 
                 with _atomic_text_writer(file_path) as stream:
@@ -1672,8 +1681,9 @@ class DataExporter:
                         literals = ", ".join(
                             value if value is not None else "NULL" for value in row
                         )
+                        # Bandit B608 review: identifiers are quoted and SQLite quote() encoded each literal.
                         stream.write(
-                            f"INSERT INTO {qtable} ({quoted_columns}) "
+                            f"INSERT INTO {qtable} ({quoted_columns}) "  # nosec B608
                             f"VALUES ({literals});\n"
                         )
         except Exception as e:
@@ -2363,7 +2373,8 @@ class BackupRestore:
                     "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                     (table,),
                 ).fetchone()
-                rows = snapshot.execute(f"SELECT * FROM {qtable}")
+                # Bandit B608 review: _qtable() validated and quoted the metadata name.
+                rows = snapshot.execute(f"SELECT * FROM {qtable}")  # nosec B608
                 table_payload[table] = {
                     "schema": schema["sql"] if schema else None,
                     "rows": [

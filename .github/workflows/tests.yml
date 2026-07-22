@@ -76,7 +76,7 @@ jobs:
           --cov-report=term-missing
           --cov-report=xml
           --cov-report=json
-          --cov-fail-under=75
+          --cov-fail-under=76
 
   security-integration:
     name: Security and optional output integrations

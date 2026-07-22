@@ -8,7 +8,7 @@ relative_files = true
 source = ["unicorefw"]
 
 [tool.coverage.report]
-fail_under = 75
+fail_under = 76
 precision = 2
 show_missing = true
 skip_covered = false

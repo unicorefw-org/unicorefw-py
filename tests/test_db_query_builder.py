@@ -80,6 +80,64 @@ def test_query_builder_executes_safe_predicates():
         db.close()
 
 
+def test_database_write_helpers_reject_injected_identifiers_before_execution():
+    db = _create_users_database()
+    injected = "users; DROP TABLE users; --"
+    operations = [
+        lambda: db.insert(injected, {"name": "Mallory"}),
+        lambda: db.insert("users", {"name; DROP TABLE users; --": "Mallory"}),
+        lambda: db.update(injected, {"name": "Mallory"}, {"id": 1}),
+        lambda: db.update("users", {"name": "Mallory"}, {injected: 1}),
+        lambda: db.delete(injected, {"id": 1}),
+        lambda: db.delete("users", {injected: 1}),
+    ]
+    try:
+        for operation in operations:
+            with pytest.raises(DatabaseError, match="Unsafe SQL identifier"):
+                operation()
+
+        assert db.fetch_one("SELECT COUNT(*) AS count FROM users") == {"count": 2}
+    finally:
+        db.close()
+
+
+def test_database_write_helpers_bind_attacker_controlled_values():
+    db = _create_users_database()
+    hostile_value = "Mallory' OR 1=1 --"
+    try:
+        assert db.update("users", {"name": hostile_value}, {"id": 1}) == 1
+        assert db.fetch_all("SELECT id, name FROM users ORDER BY id") == [
+            {"id": 1, "name": hostile_value},
+            {"id": 2, "name": "Bob"},
+        ]
+
+        assert db.delete("users", {"name": hostile_value}) == 1
+        assert db.fetch_all("SELECT id, name FROM users") == [{"id": 2, "name": "Bob"}]
+    finally:
+        db.close()
+
+
+def test_bandit_sql_exceptions_are_narrow_and_documented():
+    db_source = (Path(__file__).resolve().parents[1] / "unicorefw" / "db.py").read_text(
+        encoding="utf-8"
+    )
+    lines = db_source.splitlines()
+    suppressions = [
+        index
+        for index, line in enumerate(lines)
+        if line.rstrip().endswith("# nosec B608")
+    ]
+
+    assert len(suppressions) == 11
+    assert all(
+        any(
+            line.lstrip().startswith("# Bandit B608 review:")
+            for line in lines[max(0, index - 2) : index]
+        )
+        for index in suppressions
+    )
+
+
 def test_query_builder_supports_null_predicate_and_safe_join():
     builder = (
         QueryBuilder(engine="postgres")

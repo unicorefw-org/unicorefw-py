@@ -407,9 +407,9 @@ Run the branch-coverage gate before submitting changes:
 ```bash
 python -m pytest tests --cov=unicorefw --cov-branch \
   --cov-report=term-missing --cov-report=xml --cov-report=json \
-  --cov-fail-under=75
+  --cov-fail-under=76
 ```
 
-CI rejects regressions below the current 75% ratchet. The project target is 100%
+CI rejects regressions below the current 76% ratchet. The project target is 100%
 statement and branch coverage; maintainers raise the ratchet after each coverage
 slice.

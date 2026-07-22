@@ -435,6 +435,35 @@ Verification:
 - Python 3.11 compiled the release metadata script. Fatal Flake8 passed for the
   changed script and test.
 
+#### 2026-07-21: Bandit 1.9.4 SQL construction review
+
+Status: Complete
+
+- Reproduced all 11 B608 findings with Bandit 1.9.4.
+- Verified that each reported query routes table and column identifiers through
+  `_qtable()` or `_qident()`. Those functions enforce the identifier allowlist
+  before dialect-specific quoting.
+- Verified that insert, update, delete, and migration values remain DB-API bound
+  parameters. SQL export obtains row literals from SQLite `quote()` rather than
+  formatting caller values.
+- Added a scoped `# nosec B608` to each reviewed construction site. Every
+  suppression has an adjacent rationale, and a structural test rejects blanket
+  or undocumented B608 suppressions.
+- Added adversarial tests for table names, column names, update values, and
+  delete predicates. The tests confirm that identifier attacks fail before
+  execution and SQL-shaped values remain data.
+
+Verification:
+
+- Bandit 1.9.4 completed with 0 medium and 0 high findings. The report records
+  11 reviewed B608 suppressions.
+- Focused database security suite on Python 3.8 and 3.10: 45 passed on each
+  interpreter.
+- Full branch-coverage run: 1,431 passed and 2 optional Excel tests skipped in
+  41.11 seconds. Combined coverage reached 76.36%; statement coverage reached
+  79.15% and branch coverage reached 69.61%.
+- The CI coverage threshold increased from 75% to 76%.
+
 ### Current optimization status
 
 | Phase | Scope | Status | Exit evidence |
@@ -462,7 +491,7 @@ Verification:
 
 #### Next action
 
-- Continue the coverage campaign from the 75% ratchet, prioritizing crypto,
+- Continue the coverage campaign from the 76% ratchet, prioritizing crypto,
   database error paths, and maintained optional integrations.
 - Keep publication paused until maintainers rehearse the protected PyPI OIDC
   and provenance path.

@@ -149,4 +149,4 @@ def test_test_workflow_enforces_branch_coverage_ratchet():
     assert "--cov-report=xml" in workflow
     assert "--cov-report=json" in workflow
     assert threshold_match is not None
-    assert 73 <= float(threshold_match.group(1)) <= 100
+    assert 76 <= float(threshold_match.group(1)) <= 100
