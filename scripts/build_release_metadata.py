@@ -55,6 +55,12 @@ def write_json(file_path: Path, payload: Dict[str, Any]) -> None:
         stream.write("\n")
 
 
+def write_utf8_text(file_path: Path, content: str) -> None:
+    """Write deterministic LF text on every supported Python version."""
+    with file_path.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(content)
+
+
 def build_metadata(dist_dir: Path, output_dir: Path, version_tag: str) -> None:
     if not version_tag.startswith("v") or len(version_tag) == 1:
         fail("version must be supplied as a v-prefixed release tag")
@@ -65,10 +71,9 @@ def build_metadata(dist_dir: Path, output_dir: Path, version_tag: str) -> None:
     checksum_lines = [
         f"{artifact['sha256']}  {artifact['filename']}" for artifact in artifacts
     ]
-    (output_dir / "SHA256SUMS").write_text(
+    write_utf8_text(
+        output_dir / "SHA256SUMS",
         "\n".join(checksum_lines) + "\n",
-        encoding="utf-8",
-        newline="\n",
     )
 
     manifest = {

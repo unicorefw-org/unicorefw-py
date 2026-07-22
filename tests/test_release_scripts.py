@@ -59,7 +59,9 @@ def test_release_verifier_rejects_inconsistent_inputs(
         verify_release(tag, root=tmp_path)
 
 
-def test_release_metadata_contains_artifact_hashes_and_sbom(tmp_path: Path):
+def test_release_metadata_contains_artifact_hashes_and_sbom(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     dist_dir = tmp_path / "dist"
     output_dir = tmp_path / "release-metadata"
     dist_dir.mkdir()
@@ -68,8 +70,16 @@ def test_release_metadata_contains_artifact_hashes_and_sbom(tmp_path: Path):
     wheel_path.write_bytes(b"wheel fixture")
     source_path.write_bytes(b"source fixture")
 
+    def unsupported_write_text(*args, **kwargs):
+        raise AssertionError("Path.write_text() is unavailable to this code path")
+
+    monkeypatch.setattr(Path, "write_text", unsupported_write_text)
+
     build_metadata(dist_dir, output_dir, "v2.3.4")
 
+    checksum_bytes = (output_dir / "SHA256SUMS").read_bytes()
+    assert checksum_bytes.endswith(b"\n")
+    assert b"\r\n" not in checksum_bytes
     checksum_lines = (
         (output_dir / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
     )

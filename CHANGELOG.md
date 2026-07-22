@@ -406,6 +406,28 @@ Verification:
 - Bandit reported no medium or high findings. Fatal Flake8, compilation,
   focused Black/isort, and `git diff --check` gates passed.
 
+#### 2026-07-21: Release metadata Python compatibility
+
+Status: Complete
+
+- Replaced `Path.write_text(..., newline="\n")` in release metadata generation.
+  Python 3.7 through 3.9 do not accept the `newline` argument on
+  `Path.write_text()` even though the package declares support for those
+  versions.
+- Added one UTF-8 text writer based on `Path.open()`, whose newline interface is
+  available across the declared Python range.
+- Preserved deterministic LF output for `SHA256SUMS` on Windows and POSIX.
+- Added a regression test that disables `Path.write_text()` during metadata
+  generation and checks the checksum file's raw line endings.
+
+Verification:
+
+- Release-script suite on Python 3.10: 8 passed.
+- Full local suite: 1,427 passed and 2 optional Excel tests skipped in 13.72
+  seconds.
+- Python 3.11 compiled the release metadata script. Fatal Flake8 passed for the
+  changed script and test.
+
 ### Current optimization status
 
 | Phase | Scope | Status | Exit evidence |
