@@ -15,19 +15,16 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
 import ast
-from collections import deque
-from dataclasses import dataclass
 import re
-from typing import (
-    Any, Callable, Dict, Iterable, List, 
-    Optional, Tuple, Union, cast,
-    Sequence as TypingSequence
-)
 import unicodedata
+from collections.abc import Callable, Iterable
+from collections.abc import Sequence as TypingSequence
+from dataclasses import dataclass
+from typing import Any, cast
 
 from .security import ResourceLimitError, _validate_resource_limit
 
-PathKey = Union[str, int, Tuple[Any, ...]]
+PathKey = str | int | tuple[Any, ...]
 Path = TypingSequence[PathKey]
 
 _HARD_MAX_PATH_LENGTH = 65_536
@@ -64,7 +61,7 @@ class PathLimits:
 _DEFAULT_PATH_LIMITS = PathLimits()
 
 
-def _resolve_path_limits(limits: Optional[PathLimits]) -> PathLimits:
+def _resolve_path_limits(limits: PathLimits | None) -> PathLimits:
     if limits is None:
         return _DEFAULT_PATH_LIMITS
     if not isinstance(limits, PathLimits):
@@ -115,13 +112,13 @@ def _normalize_customizer(customizer):
     try:
         typ = type(customizer)
         return typ
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 def _ensure_container(
     parent,
     key,
-    ctor: Optional[Callable] = None,
+    ctor: Callable | None = None,
     *,
     prefer_list_index: bool = False,
     max_list_length: int = _DEFAULT_PATH_LIMITS.max_list_length,
@@ -225,7 +222,7 @@ def _call_customizer(customizer: Callable, value, key=None, parent=None):
         except TypeError:
             return customizer(value)
 
-def _iter_items_like(obj: Any) -> Iterable[Tuple[Any, Any]]:
+def _iter_items_like(obj: Any) -> Iterable[tuple[Any, Any]]:
     """
     Iterate over an object like a dict or sequence, returning (key, value) pairs.
 
@@ -256,10 +253,10 @@ def _iter_items_like(obj: Any) -> Iterable[Tuple[Any, Any]]:
         return iter(obj.items())
     if isinstance(obj, (list, tuple)):
         return iter(enumerate(obj))
-    if hasattr(obj, "items") and callable(getattr(obj, "items")):
-        return iter(getattr(obj, "items")())
-    if hasattr(obj, "iteritems") and callable(getattr(obj, "iteritems")):
-        return iter(getattr(obj, "iteritems")())
+    if hasattr(obj, "items") and callable(obj.items):
+        return iter(obj.items()) # type: ignore
+    if hasattr(obj, "iteritems") and callable(obj.iteritems):
+        return iter(obj.iteritems()) # type: ignore
     if hasattr(obj, "__dict__"):
         return iter(obj.__dict__.items())
     # last resort: single
@@ -331,7 +328,7 @@ def _ensure_len(
     if missing > 0:
         seq.extend([None] * missing)
 
-def _parse_path(path: Union[str, int]) -> List[Union[str, int]]:
+def _parse_path(path: str | int) -> list[str | int]:
     """
     Parse a path string or int into a list of path segments.
 
@@ -357,7 +354,7 @@ def _parse_path(path: Union[str, int]) -> List[Union[str, int]]:
     """
     if isinstance(path, int):
         return [path]
-    tokens: List[Union[str, int]] = []
+    tokens: list[str | int] = []
     i = 0
     while i < len(path):
         if path[i] == ".":
@@ -377,7 +374,7 @@ def _parse_path(path: Union[str, int]) -> List[Union[str, int]]:
             i = j
     return tokens
 
-def _get_by_path(obj: Any, path: List[Union[str, int]]) -> Any:
+def _get_by_path(obj: Any, path: list[str | int]) -> Any:
     """
     Safely get a nested value, returning None on any lookup failure.
 
@@ -403,21 +400,21 @@ def _get_by_path(obj: Any, path: List[Union[str, int]]) -> Any:
         try:
             # try mapping/sequence access first
             cur = cur[seg]  # type: ignore
-        except Exception:
+        except Exception:  # noqa: BLE001
             try:
                 # fallback to attribute
                 cur = getattr(cur, seg)  # type: ignore
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return None
     return cur
 
 def _set_by_path(
-    res: Dict[Any, Any],
+    res: dict[Any, Any],
     path: Path,
     value: Any,
     original: Any,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ) -> None:
     """
     Place `value` into `res` under the same nested structure as in `original`.
@@ -439,7 +436,7 @@ def _set_by_path(
     """
     resolved_limits = _resolve_path_limits(limits)
     _validate_path_parts(path, resolved_limits, mutating=True)
-    cur: Union[Dict[Any, Any], List[Any]] = res
+    cur: dict[Any, Any] | list[Any] = res
 
     for idx, seg in enumerate(path):
         last = idx == len(path) - 1
@@ -448,7 +445,7 @@ def _set_by_path(
             if isinstance(seg, int):
                 if not isinstance(cur, list):
                     raise TypeError("Internal error: expected list container")
-                seq = cast(List[Any], cur)
+                seq = cast(list[Any], cur)
                 # while len(seq) <= seg:
                 #     seq.append(None)
                 _ensure_len(
@@ -461,7 +458,7 @@ def _set_by_path(
                 # seg can be str OR tuple (PathKey excludes int here)
                 if not isinstance(cur, dict):
                     raise TypeError("Internal error: expected dict container")
-                mp = cast(Dict[Any, Any], cur)
+                mp = cast(dict[Any, Any], cur)
                 mp[seg] = value
             return
 
@@ -471,7 +468,7 @@ def _set_by_path(
             # current must be a list
             if not isinstance(cur, list):
                 raise TypeError("Internal error: expected list container")
-            seq = cast(List[Any], cur)
+            seq = cast(list[Any], cur)
             _ensure_len(
                 seq,
                 seg + 1,
@@ -481,23 +478,23 @@ def _set_by_path(
             if seq[seg] is None or not isinstance(seq[seg], (dict, list)):
                 # list element becomes list if next is int, else dict
                 seq[seg] = [] if isinstance(nxt, int) else {}
-            cur = cast(Union[Dict[Any, Any], List[Any]], seq[seg])
+            cur = cast(dict[Any, Any] | list[Any], seq[seg])
         else:
             # current must be a dict
             if not isinstance(cur, dict):
                 raise TypeError("Internal error: expected dict container")
-            mp = cast(Dict[Any, Any], cur)
+            mp = cast(dict[Any, Any], cur)
             if seg not in mp or not isinstance(mp[seg], (dict, list)):
                 # under a dict key, create list only if the NEXT segment is an int
                 mp[seg] = [] if isinstance(nxt, int) else {}
-            cur = cast(Union[Dict[Any, Any], List[Any]], mp[seg])
+            cur = cast(dict[Any, Any] | list[Any], mp[seg])
 
 
 def _parse_path_str(
     s: str,
     *,
-    limits: Optional[PathLimits] = None,
-) -> List[Union[str, int, tuple]]:
+    limits: PathLimits | None = None,
+) -> list[str | int | tuple]:
     """Parse a string into a list of path segments.
 
     This function is used to parse strings into the segments used in the path-related functions.
@@ -532,8 +529,8 @@ def _parse_path_str(
             resolved_limits.max_path_length,
             len(s),
         )
-    parts: List[Union[str, int, tuple]] = []
-    buf: List[str] = []
+    parts: list[str | int | tuple] = []
+    buf: list[str] = []
     i, n = 0, len(s)
 
     def flush():
@@ -553,7 +550,7 @@ def _parse_path_str(
         elif ch == "[":
             flush()
             j = i + 1
-            bracket: List[str] = []
+            bracket: list[str] = []
             while j < n and s[j] != "]":
                 bracket.append(s[j])
                 j += 1
@@ -563,7 +560,7 @@ def _parse_path_str(
                 lit = None
                 try:
                     lit = ast.literal_eval(token)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
                 if lit is not None:
                     parts.append(lit)
@@ -580,11 +577,11 @@ def _parse_path_str(
     return parts
 
 def _as_parts_any(
-    p: Union[str, List[Union[str, int]], Tuple, Any],
+    p: str | list[str | int] | tuple | Any,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
     mutating: bool = False,
-) -> List[Union[str, int, tuple]]:
+) -> list[str | int | tuple]:
     """
     Converts a given path to a list of path parts.
 
@@ -616,7 +613,7 @@ def _as_parts_any(
     if isinstance(p, tuple):
         parts = [p]
         _validate_path_parts(parts, resolved_limits, mutating=mutating)
-        return parts
+        return parts # type: ignore
     if isinstance(p, str):
         parts = _parse_path_str(p, limits=resolved_limits)
         _validate_path_parts(parts, resolved_limits, mutating=mutating)
@@ -630,7 +627,7 @@ def _flatten(
     array: Any,
     depth: float = float("inf"),
     *,
-    expand_types: Tuple[type, ...] = (list, tuple, set),
+    expand_types: tuple[type, ...] = (list, tuple, set),
 ) -> list:
     """
     Efficiently flatten a nested list structure to the given depth using an iterative approach.
@@ -663,8 +660,9 @@ def _flatten(
 
     result = []
     
-    # Use deque for O(1) operations - this is our main optimization
-    stack = deque([(array, depth)])
+    # A LIFO list provides the same O(1) stack operations with less per-item
+    # overhead than deque for this depth-first traversal.
+    stack = [(array, depth)]
 
     while stack:
         current, current_depth = stack.pop()
@@ -683,7 +681,7 @@ def _flatten(
     return result
 
 
-def _flatten_keys(args) -> List[Any]:
+def _flatten_keys(args) -> list[Any]:
     """
     Flatten a list of arguments, where each argument can be a list/tuple/set of values, into a single list of values.
     
@@ -858,7 +856,7 @@ def _deburr_latin_only(text: str) -> str:
     return "".join(out)
 
 
-def _try_import(module_name: str) -> Optional[Any]:
+def _try_import(module_name: str) -> Any | None:
     """
     Safely attempt to import a module.
     
@@ -875,7 +873,7 @@ def _try_import(module_name: str) -> Optional[Any]:
     try:
         import importlib
         return importlib.import_module(module_name)
-    except (ImportError, Exception):
+    except (ImportError, Exception):  # noqa: BLE001
         return None
 
 

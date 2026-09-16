@@ -5,8 +5,12 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 
 import pytest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
 
 from unicorefw.regex_policy import (
     RegexLimits,
@@ -197,7 +201,7 @@ def test_regex_policy_covers_structural_scanner_branches():
     assert compile_bounded_regex("a{", "a{").fullmatch("a{")
     assert compile_bounded_regex("a{2}", "aa").fullmatch("aa")
     assert compile_bounded_regex("a{1,}", "aaa").fullmatch("aaa")
-    assert compile_bounded_regex("a{1,3}?", "aaa").match("aaa").group() == "a"
+    assert compile_bounded_regex("a{1,3}?", "aaa").match("aaa").group() == "a" # type: ignore
 
     with pytest.raises(SecurityError, match="Backreferences"):
         compile_bounded_regex(r"(a)\1", "aa")

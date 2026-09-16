@@ -18,7 +18,8 @@ import random as random_module
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Callable, List, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from .security import (
     InputValidationError,
@@ -63,7 +64,7 @@ def identity(value: T) -> T:
     return value
 
 
-def times(n: int, func: Callable[[int], T]) -> List[T]:
+def times(n: int, func: Callable[[int], T]) -> list[T]:
     """
     Call the given function `n` times, passing the iteration index to `func`.
 
@@ -336,7 +337,7 @@ def noop() -> None:
         >>> noop()
         None
     """
-    pass
+
 
 
 def compress(word: str) -> str:
@@ -472,8 +473,8 @@ def decompress(
 
 
 def max_value(
-    array: List[T], key_func: Optional[Callable[[T], Any]] = None
-) -> Optional[T]:
+    array: list[T], key_func: Callable[[T], Any] | None = None
+) -> T | None:
     """
     Return the maximum value in the array, based on an optional key function.
 
@@ -496,8 +497,8 @@ def max_value(
 
 
 def min_value(
-    array: List[T], key_func: Optional[Callable[[T], Any]] = None
-) -> Optional[T]:
+    array: list[T], key_func: Callable[[T], Any] | None = None
+) -> T | None:
     """
     Return the minimum value in the array, based on an optional key function.
 
@@ -519,7 +520,7 @@ def min_value(
     return min(array)  # type: ignore
 
 
-def some(array: List[T], func: Callable[[T], bool]) -> bool:
+def some(array: list[T], func: Callable[[T], bool]) -> bool:
     """
     Check if at least one element in the array matches the predicate.
 
@@ -537,7 +538,7 @@ def some(array: List[T], func: Callable[[T], bool]) -> bool:
     return any(func(x) for x in array)
 
 
-def every(array: List[T], func: Callable[[T], bool]) -> bool:
+def every(array: list[T], func: Callable[[T], bool]) -> bool:
     """
     Check if every element in the array matches the predicate.
 

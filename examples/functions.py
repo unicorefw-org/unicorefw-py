@@ -10,11 +10,11 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
 ##############################################################################
 
-import os
-import glob
 import argparse
-import sys
+import glob
+import os
 import re
+import sys
 
 # Set the base directory path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))

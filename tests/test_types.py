@@ -10,20 +10,23 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
 ##############################################################################
 
+import os
 import re
 import sys
-import os
-from datetime import date
+import unittest
 from array import array
+from datetime import date
+from unittest.mock import patch
 from weakref import WeakKeyDictionary, WeakSet
 from xml.etree.ElementTree import Element
-import unittest
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
 from unicorefw import _
+from unicorefw.types import is_equal as is_equal_impl
+
 
 class TestTemplateEdgeCases(unittest.TestCase):
     def test_is_string(self):
@@ -129,3 +132,46 @@ class TestTemplateEdgeCases(unittest.TestCase):
         c = []; c.append(c); c.append(1)
         d = []; d.append(d); d.append(2)
         assert not _.is_equal(c,d)
+
+    def test_is_equal_structural_mismatch_branches(self):
+        assert not _.is_equal({"a": 1}, {"b": 1})
+        assert not _.is_equal({"a": 1}, {"a": 1, "b": 2})
+        assert not _.is_equal({"a": 1}, [("a", 1)])
+        assert not _.is_equal({1, 2}, {1, 3})
+        assert not _.is_equal([1], [1, 2])
+        assert not _.is_equal([object()], [object()])
+        assert _.is_equal((1, {"x": 2}), (1, {"x": 2}))
+        assert not _.is_equal({"a": [1]}, {"a": (1,)})
+        assert not _.is_equal({"a": 1}, {"a": 2})
+        assert not _.is_equal({1}, {2})
+        assert not _.is_equal({"a": [1]}, {"a": [2]})
+        assert not is_equal_impl([1], [2])
+        assert is_equal_impl({"a": [1]}, {"a": [1]})
+
+        class Value:
+            def __init__(self, value):
+                self.value = value
+
+            def __eq__(self, other):
+                return isinstance(other, Value) and self.value == other.value
+
+        assert not _.is_equal(Value(1), Value(2))
+        assert _.is_equal(1, 1)
+        assert _.is_equal({1}, {1})
+        assert _.is_equal(Value(1), Value(1))
+
+    def test_is_empty_and_element_fallbacks(self):
+        assert _.is_empty(iter(()))
+        assert not _.is_empty(iter((1,)))
+        assert _.is_element(Element("x"))
+
+    def test_is_element_fails_closed_when_xml_support_is_unavailable(self):
+        original_import = __import__
+
+        def reject_elementtree(name, *args, **kwargs):
+            if name == "xml.etree.ElementTree":
+                raise ImportError("simulated unavailable XML support")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=reject_elementtree):
+            assert not _.is_element(object())

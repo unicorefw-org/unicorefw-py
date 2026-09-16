@@ -13,25 +13,16 @@ You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
-import random as random_module
-import builtins  # Import Python's built-ins to avoid recursion
 import bisect
+import builtins  # Import Python's built-ins to avoid recursion
+import random as random_module
 import re
-from typing import (
-    Iterable,
-    List,
-    Tuple,
-    Callable,
-    TypeVar,
-    Union,
-    Any,
-    Optional,
-    Dict,
-    Set,
-)
-from .supporter import (
-    _flatten
-)
+from collections.abc import Callable, Iterable
+from functools import cmp_to_key as _cmp_to_key
+from itertools import chain as _chain
+from typing import Any, TypeVar
+
+from .supporter import _flatten
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -43,7 +34,109 @@ _builtin_zip = builtins.zip
 _list_pop = list.pop
 
 
-def map(array: List[T], func: Callable[[T], U]) -> List[U]:
+class _StableMembership:
+    """Track equality membership with an O(1) expected hashable fast path."""
+
+    __slots__ = ("_hashable", "_unhashable", "_values")
+
+    def __init__(self, values: Iterable[Any] = ()) -> None:
+        self._hashable: set[Any] = set()
+        self._unhashable: list[Any] = []
+        self._values: list[Any] = []
+        for value in values:
+            self.add(value)
+
+    def contains(self, value: Any) -> bool:
+        """Return whether an equal value was added."""
+        try:
+            if value in self._hashable:
+                return True
+        except TypeError:
+            return value in self._values
+        return value in self._unhashable
+
+    def add(self, value: Any) -> bool:
+        """Add a value and return whether it was not already present."""
+        if self.contains(value):
+            return False
+        try:
+            self._hashable.add(value)
+        except TypeError:
+            self._unhashable.append(value)
+        self._values.append(value)
+        return True
+
+
+def _stable_unique(
+    values: Iterable[T],
+    key: Callable[[T], Any] | None = None,
+) -> list[T]:
+    """Return first occurrences, preserving equality for unhashable values."""
+    if key is None and isinstance(values, (list, tuple)):
+        try:
+            return list(dict.fromkeys(values))
+        except TypeError:
+            pass
+    hashable_seen: set[Any] = set()
+    all_seen: list[Any] = []
+    has_unhashable = False
+    result: list[T] = []
+    for value in values:
+        marker = key(value) if key is not None else value
+        try:
+            if marker in hashable_seen:
+                continue
+            if has_unhashable and marker in all_seen:
+                continue
+            hashable_seen.add(marker)
+        except TypeError:
+            if marker in all_seen:
+                continue
+            has_unhashable = True
+        all_seen.append(marker)
+        result.append(value)
+    return result
+
+
+def _exclude_values(array: list[T], values: Iterable[Any]) -> list[T]:
+    """Filter values with an expected O(n) hashable fast path."""
+    excluded = tuple(values)
+    try:
+        excluded_set = set(excluded)
+        try:
+            return [item for item in array if item not in excluded_set]
+        except TypeError:
+            pass
+    except TypeError:
+        pass
+    membership = _StableMembership(excluded)
+    return [item for item in array if not membership.contains(item)]
+
+
+def _symmetric_difference(
+    left: Iterable[T],
+    right: Iterable[T],
+    key: Callable[[T], Any] | None = None,
+) -> list[T]:
+    """Return the stable unique symmetric difference of two iterables."""
+    left_values = list(left)
+    right_values = list(right)
+    marker = key if key is not None else (lambda value: value)
+    left_index = _StableMembership(marker(value) for value in left_values)
+    right_index = _StableMembership(marker(value) for value in right_values)
+    candidates = (
+        value
+        for values, other_index in (
+            (left_values, right_index),
+            (right_values, left_index),
+        )
+        for value in values
+        if not other_index.contains(marker(value))
+    )
+    return _stable_unique(candidates, key=key)
+
+
+def map(array: list[T], func: Callable[[T], U]) -> list[U]:
     """
     Apply a function to each element of an array and return a new array.
 
@@ -61,7 +154,7 @@ def map(array: List[T], func: Callable[[T], U]) -> List[U]:
     return [func(x) for x in array]
 
 
-def reduce(array: List[T], func: Callable[[U, T], U], initial: Optional[U] = None) -> U:
+def reduce(array: list[T], func: Callable[[U, T], U], initial: U | None = None) -> U:
     """
     Reduce an array to a single value using a function.
 
@@ -86,7 +179,7 @@ def reduce(array: List[T], func: Callable[[U, T], U], initial: Optional[U] = Non
     return result  # type: ignore
 
 
-def find(array: List[T], func: Callable[[T], bool]) -> Optional[T]:
+def find(array: list[T], func: Callable[[T], bool]) -> T | None:
     """
     Find the first element in the array that matches the predicate function.
 
@@ -114,14 +207,14 @@ def find(array: List[T], func: Callable[[T], bool]) -> Optional[T]:
         try:
             if func(x):
                 return x
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             # Handle exceptions securely
             # Optionally log the exception without exposing sensitive information
             continue  # Skip elements that cause exceptions
     return None
 
 
-def uniq(array: List[T]) -> List[T]:
+def uniq(array: list[T]) -> list[T]:
     """
     Remove duplicates from an array.
 
@@ -131,20 +224,19 @@ def uniq(array: List[T]) -> List[T]:
     Returns:
         A new array with duplicates removed
 
+    Complexity:
+        O(n) expected time for normally distributed hashable values. Inputs
+        containing unhashable values use an equality-preserving O(n²)
+        fallback in the worst case.
+
     Examples:
         >>> uniq([1, 2, 3, 2, 1])
         [1, 2, 3]
     """
-    seen = []
-    result: List[T] = []
-    for x in array:
-        if x not in seen:
-            seen.append(x)
-            result.append(x)
-    return result
+    return _stable_unique(array)
 
 
-def first(*args, **kwargs) -> Union[T, List[T], None]:
+def first(*args, **kwargs) -> T | list[T] | None:
     """
     Return the first element of an array or the first `n` elements if specified.
 
@@ -200,7 +292,7 @@ def first(*args, **kwargs) -> Union[T, List[T], None]:
     return array[:n]  # type: ignore
 
 
-def last(*args, **kwargs) -> Union[T, List[T], None]:
+def last(*args, **kwargs) -> T | list[T] | None:
     """
     Return the last element of an array or the last `n` elements if specified.
 
@@ -246,7 +338,7 @@ def last(*args, **kwargs) -> Union[T, List[T], None]:
     return array[-n:]  # type: ignore
 
 
-def compact(array: List[Any]) -> List[Any]:  # type: ignore
+def compact(array: list[Any]) -> list[Any]:  # type: ignore
     """
     Remove falsey values from an array.
 
@@ -263,7 +355,7 @@ def compact(array: List[Any]) -> List[Any]:  # type: ignore
     return [x for x in array if x]
 
 
-def without(array: List[T], *values) -> List[T]:
+def without(array: list[T], *values) -> list[T]:
     """
     Return an array excluding all provided values.
 
@@ -278,10 +370,10 @@ def without(array: List[T], *values) -> List[T]:
         >>> without([1, 2, 3], 2)
         [1, 3]
     """
-    return [x for x in array if x not in values]
+    return _exclude_values(array, values)
 
 
-def pluck(array: List[dict], key: str) -> List[Any]:
+def pluck(array: list[dict], key: str) -> list[Any]:
     """
     Extract a list of property values from an array of objects.
 
@@ -302,7 +394,7 @@ def pluck(array: List[dict], key: str) -> List[Any]:
     ]
 
 
-def shuffle(array: List[T]) -> List[T]:
+def shuffle(array: list[T]) -> list[T]:
     """
     Randomly shuffle the values in an array.
 
@@ -317,14 +409,10 @@ def shuffle(array: List[T]) -> List[T]:
         [3, 1, 5, 2, 4]
     """
     # Use the Fisher-Yates shuffle algorithm
-    array_copy = list(array)
-    for i in _builtin_range(len(array_copy) - 1, 0, -1):
-        j = random_module.randint(0, i)
-        array_copy[i], array_copy[j] = array_copy[j], array_copy[i]
-    return array_copy
+    return random_module.sample(array, len(array))
 
 
-def zip(*arrays) -> List[Tuple]:
+def zip(*arrays) -> list[tuple]:
     """
     Combine multiple arrays into an array of tuples.
 
@@ -341,9 +429,9 @@ def zip(*arrays) -> List[Tuple]:
     return list(_builtin_zip(*arrays))
 
 def unzip(
-    array_of_tuples: List[Tuple[Any, ...]],
+    array_of_tuples: list[tuple[Any, ...]],
     as_lists: bool = True
-) -> List[Union[Tuple[Any, ...], List[Any]]]:
+) -> list[tuple[Any, ...] | list[Any]]:
     """
     Reverse the zip operation by separating tuples into grouped sequences.
 
@@ -390,10 +478,10 @@ def unzip(
         return [list(group) for group in groups]
     return groups # type: ignore
 
-def unzip_(array_of_tuples: List[Tuple[Any, ...]]):
+def unzip_(array_of_tuples: list[tuple[Any, ...]]):
     return unzip(array_of_tuples, as_lists=False)
 
-def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
+def partition(array: list[T], predicate: Callable[[T], bool]) -> list[list[T]]:
     """
     Partition an array into two lists based on a predicate.
 
@@ -413,7 +501,7 @@ def partition(array: List[T], predicate: Callable[[T], bool]) -> List[List[T]]:
     return [truthy, falsy]
 
 
-def last_index_of(array: List[T], value: T, from_index: Optional[int] = None) -> int:
+def last_index_of(array: list[T], value: T, from_index: int | None = None) -> int:
     """
     Gets the index at which the last occurrence of value is found in the array.
 
@@ -445,7 +533,7 @@ def last_index_of(array: List[T], value: T, from_index: Optional[int] = None) ->
     return -1
 
 
-def chunk(array: List[T], size: int = 1) -> List[List[T]]:
+def chunk(array: list[T], size: int = 1) -> list[list[T]]:
     """
     Split an array into chunks of specified size.
 
@@ -465,7 +553,7 @@ def chunk(array: List[T], size: int = 1) -> List[List[T]]:
     return [array[i : i + size] for i in range(0, len(array), size)]
 
 
-def initial(array: List[T], n: int = 1) -> List[T]:
+def initial(array: list[T], n: int = 1) -> list[T]:
     """
     Return all elements except the last n elements.
 
@@ -483,7 +571,7 @@ def initial(array: List[T], n: int = 1) -> List[T]:
     return array[:-n] if n < len(array) else []
 
 
-def rest(array: List[T], n: int = 1) -> List[T]:
+def rest(array: list[T], n: int = 1) -> list[T]:
     """
     Return all elements except the first n elements.
 
@@ -501,7 +589,7 @@ def rest(array: List[T], n: int = 1) -> List[T]:
     return array[n:]
 
 
-def contains(array: List[T], value: T) -> bool:
+def contains(array: list[T], value: T) -> bool:
     """
     Check if a value is present in the array.
 
@@ -536,7 +624,7 @@ def flatten(array, depth=float("inf")):
     return _flatten(array, depth)
 
 
-def reject(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
+def reject(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Return items that do not match the predicate.
 
@@ -554,7 +642,7 @@ def reject(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     return [x for x in array if not predicate(x)]
 
 
-def filter(array: List[T], func: Callable[[T], bool]) -> List[T]:
+def filter(array: list[T], func: Callable[[T], bool]) -> list[T]:
     """
     Filter elements in array based on func predicate.
 
@@ -572,7 +660,7 @@ def filter(array: List[T], func: Callable[[T], bool]) -> List[T]:
     return [x for x in array if func(x)]
 
 
-def sample(array: List[T], n: int = 1) -> Union[List[T], T]:
+def sample(array: list[T], n: int = 1) -> list[T] | T:
     """
     Return a random sample from an array.
 
@@ -599,7 +687,7 @@ def sample(array: List[T], n: int = 1) -> Union[List[T], T]:
     return result
 
 
-def index_by(array: List[dict], key_func: Union[str, Callable]) -> dict:
+def index_by(array: list[dict], key_func: str | Callable) -> dict:
     """
     Index the array by a specific key or a function.
 
@@ -620,7 +708,7 @@ def index_by(array: List[dict], key_func: Union[str, Callable]) -> dict:
         return {key_func(item): item for item in array}
 
 
-def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
+def count_by(array: list[T], key_func: Callable[[T], K]) -> dict:
     """
     Count instances in an array based on a function's result.
 
@@ -648,7 +736,7 @@ def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
         try:
             key = key_func(item)
             counts[key] = counts.get(key, 0) + 1
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             # Handle exceptions securely
             # Optionally log the exception without exposing sensitive information
             continue  # Skip elements that cause exceptions
@@ -656,7 +744,7 @@ def count_by(array: List[T], key_func: Callable[[T], K]) -> dict:
     return counts
 
 
-def difference(array: List[T], *others) -> List[T]:
+def difference(array: list[T], *others) -> list[T]:
     """
     Return values from the first array not present in others.
 
@@ -665,44 +753,52 @@ def difference(array: List[T], *others) -> List[T]:
         *others: Other arrays to check against
 
     Returns:
-        An array of unique values in the first array but not in others
+        Values in the first array that are not in the other arrays. Duplicate
+        source values are preserved.
+
+    Complexity:
+        O(n + m) expected time for hashable values, where `m` is the combined
+        size of `others`. Unhashable membership uses an equality-preserving
+        linear fallback.
 
     Examples:
         >>> difference([1, 2, 3], [2, 3, 4])
         [1]
     """
-    other_elements = set().union(*others)
-    return [x for x in array if x not in other_elements]
+    other_elements = _StableMembership(
+        value for other in others for value in other
+    )
+    return [x for x in array if not other_elements.contains(x)]
 
 
-def union(*arrays: List[T], iteratee: Optional[Callable[[T], Any]] = None) -> List[T]:
+def union(*arrays: list[T], iteratee: Callable[[T], Any] | None = None) -> list[T]:
     # simple union
     """
     Creates a new list that contains unique elements from all provided arrays.
 
     Args:
         arrays: Variable number of lists from which to compute the union.
-        iteratee: An optional function that is applied to each element to generate
-                  the criterion by which uniqueness is computed.
+        iteratee: Retained for signature compatibility. Use `union_by()` when
+                  uniqueness must be computed from a derived key.
 
     Returns:
         A list of unique elements present in any of the input arrays in the order
         they first appear.
+
+    Complexity:
+        O(n) expected time for normally distributed hashable values across all
+        inputs. Unhashable values retain equality semantics through an O(n²)
+        worst-case fallback.
 
     Examples:
         >>> union([1, 2], [2, 3], [3, 4])
         [1, 2, 3, 4]
     """
 
-    result: List[T] = []
-    for arr in arrays:
-        for x in arr:
-            if x not in result:
-                result.append(x)
-    return result
+    return _stable_unique(value for array in arrays for value in array)
 
 
-def sort_by(array: List[T], key_func: Callable[[T], Any]) -> List[T]:
+def sort_by(array: list[T], key_func: Callable[[T], Any]) -> list[T]:
     """
     Sort an array by a function or key.
 
@@ -720,7 +816,7 @@ def sort_by(array: List[T], key_func: Callable[[T], Any]) -> List[T]:
     return sorted(array, key=key_func)
 
 
-def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
+def group_by(array: list[T], key_func: Callable[[T], K]) -> dict:
     """
     Group array elements by the result of a function.
 
@@ -748,7 +844,7 @@ def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
         try:
             key = key_func(item)
             grouped.setdefault(key, []).append(item)
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             # Handle exceptions securely
             # Optionally log the exception without exposing sensitive information
             continue  # Skip elements that cause exceptions
@@ -756,7 +852,7 @@ def group_by(array: List[T], key_func: Callable[[T], K]) -> dict:
     return grouped
 
 
-def range(start: int, stop: Optional[int] = None, step: int = 1) -> List[int]:
+def range(start: int, stop: int | None = None, step: int = 1) -> list[int]:
     """
     Generate an array of numbers in a range.
 
@@ -780,8 +876,8 @@ def range(start: int, stop: Optional[int] = None, step: int = 1) -> List[int]:
 
 
 def max_value(
-    array: List[T], key_func: Optional[Callable[[T], Any]] = None
-) -> Optional[T]:
+    array: list[T], key_func: Callable[[T], Any] | None = None
+) -> T | None:
     """
     Return the maximum value in the array, based on an optional key function.
     Returns None if the array is empty.
@@ -798,8 +894,8 @@ def max_value(
 
 
 def min_value(
-    array: List[T], key_func: Optional[Callable[[T], Any]] = None
-) -> Optional[T]:
+    array: list[T], key_func: Callable[[T], Any] | None = None
+) -> T | None:
     """
     Return the minimum value in the array, based on an optional key function.
     Returns None if the array is empty.
@@ -825,7 +921,7 @@ def min_value(
     return builtins.min(array)  # type: ignore
 
 
-def find_median_sorted_arrays(nums1: List[float], nums2: List[float]) -> float:
+def find_median_sorted_arrays(nums1: list[float], nums2: list[float]) -> float:
     """
     Find the median of two sorted arrays using binary search.
 
@@ -879,18 +975,22 @@ def find_median_sorted_arrays(nums1: List[float], nums2: List[float]) -> float:
 ####################################################################################
 #  Extended Array Functions
 ####################################################################################
-def difference_by(array: List[T], *args) -> List[T]:
+def difference_by(array: list[T], *args) -> list[T]:
     """
     Creates an array of values not included in the other given arrays
     using SameValueZero for equality comparisons.
 
     Args:
-        array (List[T]): The array to inspect.
-        values (List[T]): The values to exclude.
+        array (list[T]): The array to inspect.
+        values (list[T]): The values to exclude.
         iteratee (Optional[Callable[[T], Any]]): The iteratee to transform values.
 
     Returns:
-        List[T]: Returns the new array of values not included in the other given arrays.
+        list[T]: Returns the new array of values not included in the other given arrays.
+
+    Complexity:
+        O(n + m) expected time for hashable derived keys. Unhashable keys use
+        the equality-preserving fallback.
 
     Examples:
         >>> difference_by([2.1, 1.2, 2.3], [2.3, 3.4], key=lambda x: round(x))
@@ -917,22 +1017,27 @@ def difference_by(array: List[T], *args) -> List[T]:
             )
     else:
         key = iteratee  # type: ignore
-    other_keys = {key(v) for v in (values or [])}
-    return [item for item in array if key(item) not in other_keys]
+    other_keys = _StableMembership(key(v) for v in (values or []))
+    return [
+        item for item in array if not other_keys.contains(key(item))
+    ]
 
 
-def difference_with(array: List[T], *args) -> List[T]:
+def difference_with(array: list[T], *args) -> list[T]:
     """
     Creates an array of values not included in the other given arrays
     using `comparator` for equality comparisons.
 
     Args:
-        array (List[T]): The array to inspect.
-        values (List[T]): The values to exclude.
+        array (list[T]): The array to inspect.
+        values (list[T]): The values to exclude.
         comparator (Optional[Callable[[T, T], bool]]): The comparator to transform values.
 
     Returns:
-        List[T]: Returns the new array of values not included in the other given arrays.
+        list[T]: Returns the new array of values not included in the other given arrays.
+
+    Complexity:
+        O(n * m); a custom comparator requires pairwise comparisons.
 
     Examples:
         >>> difference_with([2.1, 1.2, 2.3], [2.3, 3.4], lambda a, b: round(a, 1) == round(b, 1))
@@ -941,20 +1046,20 @@ def difference_with(array: List[T], *args) -> List[T]:
     if not args:
         return list(array)
     comparator = args[-1] if callable(args[-1]) else None  # type: ignore
-    values = args[0] if comparator else args[0]
+    values = args[0] if comparator else args[0]  # noqa: RUF034
     if comparator is None:
 
         def comparator(a, b):
             return a == b  # type: ignore
 
-    result: List[T] = []
+    result: list[T] = []
     for item in array:
         if not any(comparator(item, v) for v in values):
             result.append(item)
     return result
 
 
-def drop(array: List[T], n: int = 1) -> List[T]:
+def drop(array: list[T], n: int = 1) -> list[T]:
     """
     Creates a slice of `array` with `n` elements dropped from the beginning.
 
@@ -972,7 +1077,7 @@ def drop(array: List[T], n: int = 1) -> List[T]:
     return array[n:]
 
 
-def drop_right(array: List[T], n: int = 1) -> List[T]:
+def drop_right(array: list[T], n: int = 1) -> list[T]:
     """
     Creates a slice of `array` with `n` elements dropped from the end.
 
@@ -990,7 +1095,7 @@ def drop_right(array: List[T], n: int = 1) -> List[T]:
     return array[:-n] if n else list(array)
 
 
-def drop_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
+def drop_while(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Creates a slice of `array` excluding elements dropped from the beginning. Elements are dropped
     until `predicate` returns falsey. The predicate is invoked with three arguments: (value, index, array).
@@ -1012,7 +1117,7 @@ def drop_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     return []
 
 
-def drop_right_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
+def drop_right_while(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Creates a slice of `array` excluding elements dropped from the end. Elements are dropped until
     `predicate` returns falsey. The predicate is invoked with three arguments: (value, index, array).
@@ -1034,7 +1139,7 @@ def drop_right_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     return []
 
 
-def duplicates(array: List[T], iteratee: Callable[[T], Any] = lambda x: x) -> List[T]:
+def duplicates(array: list[T], iteratee: Callable[[T], Any] = lambda x: x) -> list[T]:
     """
     Creates an array of unique elements from the first occurrence of each value in `array`.
 
@@ -1049,21 +1154,33 @@ def duplicates(array: List[T], iteratee: Callable[[T], Any] = lambda x: x) -> Li
         >>> duplicates([0, 1, 3, 2, 3, 1])
         [3, 1]
     """
-    seen: set = set()
-    dup_set: set = set()
-    result: List[T] = []
-    for item in array:
-        key = iteratee(item)
-        if key in seen and key not in dup_set:
-            dup_set.add(key)
-            result.append(item)
-        seen.add(key)
-    return result
+    keys = [iteratee(item) for item in array]
+    try:
+        set(keys)
+        seen: set[Any] = set()
+        duplicates_seen: set[Any] = set()
+        result: list[T] = []
+        for item, key in zip(array, keys):
+            if key in seen:
+                if key not in duplicates_seen:
+                    duplicates_seen.add(key)
+                    result.append(item)
+            else:
+                seen.add(key)
+        return result
+    except TypeError:
+        seen_fallback = _StableMembership()
+        duplicate_fallback = _StableMembership()
+        result = []
+        for item, key in zip(array, keys):
+            if not seen_fallback.add(key) and duplicate_fallback.add(key):
+                result.append(item)
+        return result
 
 
 def fill(
-    array: List[T], value: T, start: int = 0, end: Optional[int] = None
-) -> List[T]:
+    array: list[T], value: T, start: int = 0, end: int | None = None
+) -> list[T]:
     """
     Fills elements of array with value from start up to, but not including, end.
 
@@ -1095,13 +1212,12 @@ def fill(
     e = e if e >= 0 else max(length + e, 0)
     s = min(max(s, 0), length)
     e = min(max(e, 0), length)
-    for i in builtins.range(s, e):
-        array[i] = value
+    array[s:e] = [value] * (e - s)
     return array
 
 
 def find_index(
-    array: List[T], filter_by: Union[Callable[[T], bool], Dict[str, Any], Any]
+    array: list[T], filter_by: Callable[[T], bool] | dict[str, Any] | Any
 ) -> int:
     """
     Gets the index at which the first occurrence of value is found.
@@ -1134,13 +1250,13 @@ def find_index(
         try:
             if predicate(item):
                 return idx
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             continue
     return -1
 
 
 def find_last_index(
-    array: List[T], filter_by: Union[Callable[[T], bool], Dict[str, Any], Any]
+    array: list[T], filter_by: Callable[[T], bool] | dict[str, Any] | Any
 ) -> int:
     """
     Gets the index at which the last occurrence of value is found.
@@ -1173,12 +1289,12 @@ def find_last_index(
         try:
             if predicate(array[idx]):
                 return idx
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             continue
     return -1
 
 
-def flatten_deep(array: Any) -> List[Any]:
+def flatten_deep(array: Any) -> list[Any]:
     """
     Recursively flattens array.
 
@@ -1195,7 +1311,7 @@ def flatten_deep(array: Any) -> List[Any]:
     return flatten(array, float("inf"))  # type: ignore
 
 
-def flatten_depth(array: Any, depth: int = 1) -> List[Any]:
+def flatten_depth(array: Any, depth: int = 1) -> list[Any]:
     """
     Recursively flattens array up to the specified depth.
 
@@ -1210,10 +1326,26 @@ def flatten_depth(array: Any, depth: int = 1) -> List[Any]:
         >>> flatten_depth([[1], [2, [3]], [[4]]], 2)
         [1, 2, 3, [4]]
     """
-    return flatten(array, depth)
+    if depth <= 0:
+        return flatten(array, depth)
+    if array is None:
+        return []
+    if not isinstance(array, (list, tuple, set)):
+        return [array]
+    result: list[Any] = []
+
+    def visit(values: Any, remaining: int) -> None:
+        for value in values:
+            if isinstance(value, (list, tuple, set)) and remaining:
+                visit(value, remaining - 1)
+            else:
+                result.append(value)
+
+    visit(array, depth)
+    return result
 
 
-def from_pairs(pairs: List[Tuple[K, V]]) -> Dict[K, V]:
+def from_pairs(pairs: list[tuple[K, V]]) -> dict[K, V]:
     """
     Converts a list of [key, value] pairs into an object.
 
@@ -1227,10 +1359,10 @@ def from_pairs(pairs: List[Tuple[K, V]]) -> Dict[K, V]:
         >>> from_pairs([["a", 1], ["b", 2]]) == {"a": 1, "b": 2}
         True
     """
-    return {k: v for k, v in pairs}
+    return dict(pairs)
 
 
-def head(array: List[T]) -> Optional[T]:
+def head(array: list[T]) -> T | None:
     """
     Returns the first element of the array, if it exists.
 
@@ -1250,7 +1382,7 @@ def head(array: List[T]) -> Optional[T]:
     return array[0] if array else None
 
 
-def index_of(array: List[T], value: T, from_index: int = 0) -> int:
+def index_of(array: list[T], value: T, from_index: int = 0) -> int:
     """
     Gets the index at which the first occurrence of value is found.
 
@@ -1268,15 +1400,13 @@ def index_of(array: List[T], value: T, from_index: int = 0) -> int:
         >>> index_of([2, 1, 2, 3], 2, from_index=1)
         2
     """
-    length = len(array)
-    start = from_index if from_index >= 0 else max(length + from_index, 0)
-    for i in builtins.range(start, length):
-        if array[i] == value:
-            return i
-    return -1
+    try:
+        return array.index(value, from_index)
+    except ValueError:
+        return -1
 
 
-def interleave(*arrays: List[T]) -> List[T]:
+def interleave(*arrays: list[T]) -> list[T]:
     """
     Merge multiple lists into a single list by inserting the next element of each list by sequential
     round-robin into the new list.
@@ -1291,7 +1421,9 @@ def interleave(*arrays: List[T]) -> List[T]:
         >>> interleave([1, 2, 3], [4, 5, 6], [7, 8, 9])
         [1, 4, 7, 2, 5, 8, 3, 6, 9]
     """
-    result: List[T] = []
+    if arrays and all(len(array) == len(arrays[0]) for array in arrays[1:]):
+        return list(_chain.from_iterable(zip(*arrays)))
+    result: list[T] = []
     max_len = max((len(arr) for arr in arrays), default=0)
     for i in builtins.range(max_len):
         for arr in arrays:
@@ -1300,7 +1432,7 @@ def interleave(*arrays: List[T]) -> List[T]:
     return result
 
 
-def intersection_with(array: List[T], *args) -> List[T]:
+def intersection_with(array: list[T], *args) -> list[T]:
     """
     Like intersection but accepts a comparator which is invoked to compare the elements of all arrays.
     The order and references of result values are determined by the first array. The comparator is invoked with two arguments: ``(arr_val, oth_val)``.
@@ -1312,6 +1444,10 @@ def intersection_with(array: List[T], *args) -> List[T]:
     Returns:
         Intersection of provided lists.
 
+    Complexity:
+        Quadratic or greater depending on the number of arrays; comparator
+        contracts require pairwise comparisons.
+
     Examples:
         >>> array = ["apple", "banana", "pear"]
         >>> others = (["avocado", "pumpkin"], ["peach"])
@@ -1321,7 +1457,7 @@ def intersection_with(array: List[T], *args) -> List[T]:
     """
     # last arg may be comparator
     comparator = None
-    arrays: List[List[T]] = []
+    arrays: list[list[T]] = []
     if args and (callable(args[-1]) or args[-1] is None):
         comparator = args[-1]
         arrays = list(args[:-1])  # type: ignore
@@ -1330,7 +1466,7 @@ def intersection_with(array: List[T], *args) -> List[T]:
     if not arrays:
         return array.copy()
     cmp = comparator if callable(comparator) else (lambda a, b: a == b)
-    result: List[T] = []
+    result: list[T] = []
     for x in array:
         if any(cmp(x, y) for y in result):
             continue
@@ -1339,7 +1475,7 @@ def intersection_with(array: List[T], *args) -> List[T]:
     return result
 
 
-def intersperse(array: List[T], sep: T) -> List[T]:
+def intersperse(array: list[T], sep: T) -> list[T]:
     """
     Insert a separating element between the elements of `array`.
 
@@ -1354,15 +1490,15 @@ def intersperse(array: List[T], sep: T) -> List[T]:
         >>> intersperse([1, [2], [3], 4], "x")
         [1, 'x', [2], 'x', [3], 'x', 4]
     """
-    result: List[T] = []
-    for idx, item in enumerate(array):
-        if idx:
-            result.append(sep)
-        result.append(item)
+    length = len(array)
+    if length < 2:
+        return array.copy()
+    result: list[T] = [sep] * (length * 2 - 1)
+    result[::2] = array
     return result
 
 
-def mapcat(array: List[T], func: Callable[[T, int], List[U]]) -> List[U]:
+def mapcat(array: list[T], func: Callable[[T, int], list[U]]) -> list[U]:
     """
     Map over an array, concatenating the results.
 
@@ -1379,14 +1515,14 @@ def mapcat(array: List[T], func: Callable[[T, int], List[U]]) -> List[U]:
         [1, 1, 2, 2, 3, 3]
     """
 
-    result: List[U] = []
+    result: list[U] = []
     for idx, x in enumerate(array):
         res = func(x, idx)  # type: ignore
         result.extend(res or [])
     return result
 
 
-def nth(array: List[T], index: int) -> Optional[T]:
+def nth(array: list[T], index: int) -> T | None:
     """
     Gets the element at index n of array.
 
@@ -1419,7 +1555,7 @@ def nth(array: List[T], index: int) -> Optional[T]:
     return None
 
 
-def pull(array: List[T], *values: T) -> List[T]:
+def pull(array: list[T], *values: T) -> list[T]:
     """
     Removes all provided values from the given array.
 
@@ -1438,10 +1574,10 @@ def pull(array: List[T], *values: T) -> List[T]:
         >>> pull([1, 2, 2, 3, 3, 4], 2, 3)
         [1, 4]
     """
-    return [x for x in array if x not in values]
+    return _exclude_values(array, values)
 
 
-def pull_all(array: List[T], values: List[T]) -> List[T]:
+def pull_all(array: list[T], values: list[T]) -> list[T]:
     """
     Removes all provided values from the given array.
 
@@ -1452,16 +1588,20 @@ def pull_all(array: List[T], values: List[T]) -> List[T]:
     Returns:
         A new list with the specified values removed.
 
+    Complexity:
+        O(n + m) expected time for hashable values. Unhashable membership uses
+        the equality-preserving fallback.
+
     Examples:
         >>> pull_all([1, 2, 2, 3, 3, 4], [2, 3])
         [1, 4]
     """
-    return [x for x in array if x not in values]
+    return _exclude_values(array, values)
 
 
 def pull_all_by(
-    array: List[T], values: List[T], iteratee: Optional[Callable[[T], Any]] = None
-) -> List[T]:
+    array: list[T], values: list[T], iteratee: Callable[[T], Any] | None = None
+) -> list[T]:
     """
     Removes all elements from array that have the same value as the result of calling
     the iteratee on each element of values. The iteratee is invoked with one argument:
@@ -1475,19 +1615,26 @@ def pull_all_by(
     Returns:
         A new list with the specified values removed.
 
+    Complexity:
+        O(n + m) expected time for hashable derived keys. Unhashable keys use
+        the equality-preserving fallback.
+
     Examples:
         >>> pull_all_by([1, 2, 3], [2, 3], lambda x: x % 2)
         [1]
     """
     if iteratee is None:
-        return [x for x in array if x not in values]
-    keys = {iteratee(v) for v in values}
-    return [x for x in array if iteratee(x) not in keys]
+        excluded = _StableMembership(values)
+        return [x for x in array if not excluded.contains(x)]
+    keys = _StableMembership(iteratee(v) for v in values)
+    return [
+        x for x in array if not keys.contains(iteratee(x))
+    ]
 
 
 def pull_all_with(
-    array: List[T], values: List[T], comparator: Optional[Callable[[T, T], bool]] = None
-) -> List[T]:
+    array: list[T], values: list[T], comparator: Callable[[T, T], bool] | None = None
+) -> list[T]:
     """
     Removes all elements from array that have the same value as the result of calling
     the comparator between the elements of array and values. The comparator is invoked
@@ -1501,16 +1648,21 @@ def pull_all_with(
     Returns:
         A new list with the specified values removed.
 
+    Complexity:
+        O(n + m) expected time without a comparator. Supplying a comparator
+        requires O(n * m) pairwise comparisons.
+
     Examples:
         >>> pull_all_with([1, 2, 3], [2, 3], lambda a, b: a == b)
         [1]
     """
     if comparator is None:
-        return [x for x in array if x not in values]
+        excluded = _StableMembership(values)
+        return [x for x in array if not excluded.contains(x)]
     return [x for x in array if not any(comparator(x, v) for v in values)]
 
 
-def push(array: List[T], *values: T) -> List[T]:
+def push(array: list[T], *values: T) -> list[T]:
     """
     Appends values to the end of an array.
 
@@ -1531,7 +1683,7 @@ def push(array: List[T], *values: T) -> List[T]:
     array.extend(values)
     return array
 
-def shift(array: List[T]) -> Optional[T]:
+def shift(array: list[T]) -> T | None:
     """
     Remove the first element of the array and return it.
 
@@ -1550,11 +1702,11 @@ def shift(array: List[T]) -> Optional[T]:
         [2, 3]
     """
     if array:
-        return array.pop(0)
+        return _list_pop(array, 0)
     return None
 
 
-def sorted_index(array: List[T], value: T) -> int:
+def sorted_index(array: list[T], value: T) -> int:
     """
     Determines the lowest index at which `value` should be inserted into `array`
     in order to maintain its sorted order.
@@ -1573,7 +1725,7 @@ def sorted_index(array: List[T], value: T) -> int:
     return bisect.bisect_left(array, value)  # type: ignore
 
 
-def sorted_index_of(array: List[T], value: T) -> int:
+def sorted_index_of(array: list[T], value: T) -> int:
     """
     Return the index of the first occurrence of `value` in `array` if `array` is sorted.
 
@@ -1594,7 +1746,7 @@ def sorted_index_of(array: List[T], value: T) -> int:
         return -1
 
 
-def sorted_last_index(array: List[T], value: T) -> int:
+def sorted_last_index(array: list[T], value: T) -> int:
     """
     Determines the highest index at which `value` should be inserted into `array`
     in order to maintain its sorted order.
@@ -1613,7 +1765,7 @@ def sorted_last_index(array: List[T], value: T) -> int:
     return bisect.bisect_right(array, value)  # type: ignore
 
 
-def sorted_last_index_of(array: List[T], value: T) -> int:
+def sorted_last_index_of(array: list[T], value: T) -> int:
     """
     This method is like `sorted_last_index` except that it returns the index of the
     closest element to the supplied `value` in a sorted `array`. If `value` is not
@@ -1631,16 +1783,16 @@ def sorted_last_index_of(array: List[T], value: T) -> int:
         >>> sorted_last_index_of([1, 2, 3, 4], 4.2)
         3
     """
-    idx = array[::-1].index(value) if value in array else -1
-    return len(array) - idx - 1 if idx >= 0 else -1
+    idx = bisect.bisect_right(array, value) - 1  # type: ignore
+    return idx if idx >= 0 and array[idx] == value else -1
 
 
 def splice(
-    array: Union[List[T], str],
+    array: list[T] | str,
     start: int,
-    delete_count: Optional[int] = None,
+    delete_count: int | None = None,
     *items: Any,
-) -> Union[List[T], str]:
+) -> list[T] | str:
     # List handling
     """
     Modify the contents of `array` by inserting elements starting at index `start` and removing
@@ -1693,7 +1845,7 @@ def splice(
     return text[:s] + "".join(items) + text[s + d :]
 
 
-def split_at(array: List[T], index: int) -> List[List[T]]:
+def split_at(array: list[T], index: int) -> list[list[T]]:
     """
     Splits an array into two sub-arrays at a specified index.
 
@@ -1714,7 +1866,7 @@ def split_at(array: List[T], index: int) -> List[List[T]]:
     return [array[:index], array[index:]]
 
 
-def tail(array: List[T]) -> List[T]:
+def tail(array: list[T]) -> list[T]:
     """
     Returns all but the first element of `array`.
 
@@ -1731,7 +1883,7 @@ def tail(array: List[T]) -> List[T]:
     return array[1:]
 
 
-def take(array: List[T], n: int = 1) -> List[T]:
+def take(array: list[T], n: int = 1) -> list[T]:
     """
     Creates a slice of `array` with `n` elements taken from the beginning.
 
@@ -1749,7 +1901,7 @@ def take(array: List[T], n: int = 1) -> List[T]:
     return array[:n]
 
 
-def take_right(array: List[T], n: int = 1) -> List[T]:
+def take_right(array: list[T], n: int = 1) -> list[T]:
     """
     Creates a slice of `array` with `n` elements taken from the end.
 
@@ -1767,7 +1919,7 @@ def take_right(array: List[T], n: int = 1) -> List[T]:
     return array[-n:] if n else []
 
 
-def take_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
+def take_while(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Creates a slice of `array` with elements taken from the beginning. Elements are taken until `predicate` returns falsey. The predicate is invoked with one argument: `(value)`.
 
@@ -1782,7 +1934,7 @@ def take_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
         >>> take_while([1, 2, 3, 4], lambda x: x < 3)
         [1, 2]
     """
-    result: List[T] = []
+    result: list[T] = []
     for x in array:
         if predicate(x):
             result.append(x)
@@ -1791,7 +1943,7 @@ def take_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     return result
 
 
-def take_right_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
+def take_right_while(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Creates a slice of `array` with elements taken from the end. Elements are taken until `predicate` returns falsey. The predicate is invoked with one argument: `(value)`.
 
@@ -1802,22 +1954,26 @@ def take_right_while(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
     Returns:
         Taken list.
 
+    Complexity:
+        O(n); matching values are collected in reverse and reversed once.
+
     Examples:
         >>> take_right_while([1, 2, 3, 4], lambda x: x >= 3)
         [3, 4]
     """
-    result: List[T] = []
+    result: list[T] = []
     for x in reversed(array):
         if predicate(x):
-            result.insert(0, x)
+            result.append(x)
         else:
             break
+    result.reverse()
     return result
 
 
 def union_by(
-    *arrays: List[T], iteratee: Optional[Callable[[T], Any]] = None
-) -> List[T]:
+    *arrays: list[T], iteratee: Callable[[T], Any] | None = None
+) -> list[T]:
     """
     Creates a new list that contains unique elements from all provided arrays,
     determined by the result of running each element through the iteratee function.
@@ -1829,6 +1985,10 @@ def union_by(
 
     Returns:
         A list of unique elements present in any of the input arrays based on the iteratee.
+
+    Complexity:
+        O(n) expected time when derived keys are normally distributed and
+        hashable. Unhashable keys use the equality-preserving fallback.
 
     Examples:
         >>> union_by([1, 2, 3], [2, 3, 4], lambda x: x % 2)
@@ -1842,18 +2002,13 @@ def union_by(
         iteratee = arrays[-1]  # type: ignore
         args = args[:-1]
     fn = iteratee if callable(iteratee) else (lambda x: x)  # type: ignore
-    seen = set()
-    result: List[T] = []
-    for arr in args:
-        for x in arr:
-            k = fn(x)
-            if k not in seen:
-                seen.add(k)
-                result.append(x)
-    return result
+    return _stable_unique(
+        (value for array in args for value in array),
+        key=fn,
+    )
 
 
-def union_with(array: List[T], *args) -> List[T]:
+def union_with(array: list[T], *args) -> list[T]:
     """
     Creates a new list that contains unique elements from all provided arrays,
     determined by the comparator function.
@@ -1865,19 +2020,22 @@ def union_with(array: List[T], *args) -> List[T]:
     Returns:
         A list of unique elements present in any of the input arrays based on the comparator.
 
+    Complexity:
+        O(n²); custom comparator contracts require pairwise comparisons.
+
     Examples:
         >>> union_with([1, 2, 3], [2, 3, 4], lambda a, b: a == b)
         [1, 2, 3, 4]
     """
 
     comparator = None
-    rest_arrays: List[List[T]] = []
+    rest_arrays: list[list[T]] = []
     if args and callable(args[-1]):
         comparator = args[-1]
         rest_arrays = list(args[:-1])  # type: ignore
     else:
         rest_arrays = list(args)  # type: ignore
-    result: List[T] = []
+    result: list[T] = []
     cmp = comparator if callable(comparator) else (lambda a, b: a == b)
     for x in concat(array, *rest_arrays):
         if not any(cmp(x, y) for y in result):
@@ -1886,8 +2044,8 @@ def union_with(array: List[T], *args) -> List[T]:
 
 
 def uniq_by(
-    array: List[T], iteratee: Union[str, Callable[[T], Any], Dict[str, Any]]
-) -> List[T]:
+    array: list[T], iteratee: str | Callable[[T], Any] | dict[str, Any]
+) -> list[T]:
     # support dict, str, or callable
     """
     Creates a duplicate-value-free version of the array. Only the first occurrence of each value
@@ -1904,13 +2062,17 @@ def uniq_by(
     Returns:
         Unique list.
 
+    Complexity:
+        O(n) expected time for normally distributed hashable keys. Unhashable
+        keys use the equality-preserving O(n²) worst-case fallback.
+
     Examples:
         >>> uniq_by([1, 2, 3, 1, 2, 3], lambda val: val % 2)
         [1, 2]
     """
     if isinstance(iteratee, dict):
-        pred = lambda x: all(x.get(k) == v for k, v in iteratee.items())  # noqa: E731
-        key_fn = lambda x: bool(pred(x))  # noqa: E731
+        pred = lambda x: all(x.get(k) == v for k, v in iteratee.items())
+        key_fn = lambda x: bool(pred(x))
     elif isinstance(iteratee, str):
 
         def key_fn(x):
@@ -1920,17 +2082,22 @@ def uniq_by(
     else:
         key_fn = iteratee # type: ignore
         
-    seen = set()
-    result: List[T] = []
-    for x in array:
-        k = key_fn(x)
-        if k not in seen:
-            seen.add(k)
-            result.append(x)
-    return result
+    if isinstance(array, list):
+        keys = [key_fn(value) for value in array]
+        try:
+            seen: set[Any] = set()
+            result: list[T] = []
+            for value, marker in zip(array, keys):
+                if marker not in seen:
+                    seen.add(marker)
+                    result.append(value)
+            return result
+        except TypeError:
+            pass
+    return _stable_unique(array, key=key_fn)
 
 
-def uniq_with(array: List[T], comparator: Callable[[T, T], bool]) -> List[T]:
+def uniq_with(array: list[T], comparator: Callable[[T, T], bool]) -> list[T]:
     """
     Creates a duplicate-value-free version of the array. Only the first occurrence of each value
     is kept. The order of result values is determined by the order they occur in the array.
@@ -1942,18 +2109,21 @@ def uniq_with(array: List[T], comparator: Callable[[T, T], bool]) -> List[T]:
     Returns:
         Unique list.
 
+    Complexity:
+        O(n²); custom comparator contracts require pairwise comparisons.
+
     Examples:
         >>> uniq_with([1, 2, 3, 1, 2, 3], lambda a, b: a == b)
         [1, 2, 3]
     """
-    result: List[T] = []
+    result: list[T] = []
     for item in array:
         if not any(comparator(item, x) for x in result):
             result.append(item)
     return result
 
 
-def zip_object(keys: List[K], values: Optional[List[V]] = None) -> Dict[K, V]:
+def zip_object(keys: list[K], values: list[V] | None = None) -> dict[K, V]:
     """
     Creates an object composed of the given keys and values.
     If the `values` list is not provided, the `keys` list is treated as a list of key-value pairs.
@@ -1978,8 +2148,8 @@ def zip_object(keys: List[K], values: Optional[List[V]] = None) -> Dict[K, V]:
 
 
 def zip_object_deep(
-    keys: List[Any], values: Optional[List[Any]] = None
-) -> Dict[Any, Any]:
+    keys: list[Any], values: list[Any] | None = None
+) -> dict[Any, Any]:
     """
     Creates a nested object from the given keys and values. If the `values` list is not provided, the `keys` list is treated as a list of key-value pairs.
 
@@ -1994,7 +2164,7 @@ def zip_object_deep(
         >>> zip_object_deep(["a.b.c", "a.b.d"], [1, 2])
         {"a": {"b": {"c": 1, "d": 2}}}
     """
-    result: Dict[Any, Any] = {}
+    result: dict[Any, Any] = {}
     # Build key-value pairs
     if values is None:
         pairs = keys  # type: ignore
@@ -2010,7 +2180,7 @@ def zip_object_deep(
             if part.isdigit():
                 idx = int(part)
                 if not isinstance(node, list):
-                    raise TypeError("Expected list at part %r" % part)
+                    raise TypeError(f"Expected list at part {part!r}")
                 while len(node) <= idx:
                     node.append({})
                 if is_last:
@@ -2035,7 +2205,7 @@ def zip_object_deep(
     return result
 
 
-def concat(*arrays: Union[List[T], T]) -> List[T]:
+def concat(*arrays: list[T] | T) -> list[T]:
     """
     Flattens an array of arrays or values into a single array.
 
@@ -2049,7 +2219,7 @@ def concat(*arrays: Union[List[T], T]) -> List[T]:
         >>> concat([1, 2, 3], [4, [5, 6]], 7, 8)
         [1, 2, 3, 4, 5, 6, 7, 8]
     """
-    result: List[T] = []
+    result: list[T] = []
     for arr in arrays:
         if isinstance(arr, (list, tuple)):
             result.extend(arr)  # type: ignore
@@ -2059,7 +2229,7 @@ def concat(*arrays: Union[List[T], T]) -> List[T]:
 
 
 def sorted_index_by(
-    array: List[T], value: T, key: Union[str, Callable[[T], Any]]
+    array: list[T], value: T, key: str | Callable[[T], Any]
 ) -> int:
     """
     Returns the index at which the value should be inserted to maintain sorted order.
@@ -2077,15 +2247,24 @@ def sorted_index_by(
         3
     """
     if isinstance(key, str):
-        fn = lambda x: x.get(key) if isinstance(x, dict) else getattr(x, key, None)  # noqa: E731
+        fn = lambda x: x.get(key) if isinstance(x, dict) else getattr(x, key, None)
     else:
         fn = key  # type: ignore
-    keys = [fn(x) for x in array]
-    return bisect.bisect_left(keys, fn(value))  # type: ignore
+    target = fn(value)
+    left, right = 0, len(array)
+    while left < right:
+        middle = (left + right) // 2
+        middle_val = fn(array[middle])
+        # guard against comparing None with other types
+        if middle_val is not None and target is not None and middle_val < target:
+            left = middle + 1
+        else:
+            right = middle
+    return left
 
 
 def sorted_last_index_by(
-    array: List[T], value: T, key: Union[str, Callable[[T], Any]]
+    array: list[T], value: T, key: str | Callable[[T], Any]
 ) -> int:
     """
     Returns the highest index at which `value` should be inserted into `array` in order to maintain
@@ -2105,14 +2284,22 @@ def sorted_last_index_by(
     """
 
     if isinstance(key, str):
-        fn = lambda x: x.get(key) if isinstance(x, dict) else getattr(x, key, None)  # noqa: E731
+        fn = lambda x: x.get(key) if isinstance(x, dict) else getattr(x, key, None)
     else:
         fn = key  # type: ignore
-    keys = [fn(x) for x in array]
-    return bisect.bisect_right(keys, fn(value))  # type: ignore
+    target = fn(value)
+    left, right = 0, len(array)
+    while left < right:
+        middle = (left + right) // 2
+        middle_val = fn(array[middle])
+        if target is not None and middle_val is not None and target < middle_val:
+            right = middle
+        else:
+            left = middle + 1
+    return left
 
 
-def sorted_uniq(array: List[T]) -> List[T]:
+def sorted_uniq(array: list[T]) -> list[T]:
     """
     Creates a duplicate-free version of an array, keeping only the first occurrence
     of each element, then sorted by the original elements.
@@ -2137,16 +2324,10 @@ def sorted_uniq(array: List[T]) -> List[T]:
         >>> sorted_uniq([1, 2, 3, 2, 1])
         [1, 2, 3]
     """
-    seen = set()
-    result: List[T] = []
-    for x in sorted(array):  # type: ignore
-        if x not in seen:
-            seen.add(x)
-            result.append(x)
-    return result
+    return _stable_unique(sorted(array))  # type: ignore
 
 
-def sorted_uniq_by(array: List[Any], iteratee: Callable[[Any], Any]) -> List[Any]:
+def sorted_uniq_by(array: list[Any], iteratee: Callable[[Any], Any]) -> list[Any]:
     """
     Creates a duplicate-free version of an array, keeping only the first occurrence
     of each element based on the iteratee function, then sorted by the original elements.
@@ -2178,27 +2359,16 @@ def sorted_uniq_by(array: List[Any], iteratee: Callable[[Any], Any]) -> List[Any
     if not callable(iteratee):
         raise TypeError("Iteratee must be callable")
 
-    # Track seen keys and collect unique elements
-    seen_keys: Set[Any] = set()
-    unique_elements: List[Any] = []
-
-    # First pass: collect unique elements (first occurrence only)
-    for element in array:
-        try:
-            key = iteratee(element)
-            if key not in seen_keys:
-                seen_keys.add(key)
-                unique_elements.append(element)
-        except (TypeError, AttributeError) as e:
-            raise TypeError(f"Iteratee function failed on element {element}: {str(e)}")
-
-    # Sort by the original elements themselves, not by iteratee values
+    try:
+        unique_elements = _stable_unique(array, key=iteratee)
+    except (TypeError, AttributeError) as exc:
+        raise TypeError(f"Iteratee function failed: {type(exc).__name__}") from exc
     unique_elements.sort()
 
     return unique_elements
 
 
-def intercalate(array: List[T], separator: List[T]) -> List[T]:
+def intercalate(array: list[T], separator: list[T]) -> list[T]:
     """
     Creates a new list by intercalating a given list of elements with a separator value.
 
@@ -2213,7 +2383,7 @@ def intercalate(array: List[T], separator: List[T]) -> List[T]:
         >>> intercalate([1, 2, 3], [4, 5, 6])
         [1, 4, 5, 6, 2, 4, 5, 6, 3]
     """
-    result: List[T] = []
+    result: list[T] = []
     for i, x in enumerate(array):
         if i:
             result.extend(separator)
@@ -2224,7 +2394,7 @@ def intercalate(array: List[T], separator: List[T]) -> List[T]:
     return result
 
 
-def pop(array: List[T], index: Optional[int] = None) -> T:
+def pop(array: list[T], index: int | None = None) -> T:
     """
     Remove and return an element from the list at the specified index. If no index
     is specified, removes and returns the last element.
@@ -2256,7 +2426,7 @@ def pop(array: List[T], index: Optional[int] = None) -> T:
     return _list_pop(array, index)
 
 
-def pull_at(array: List[T], *indexes: int) -> List[T]:
+def pull_at(array: list[T], *indexes: int) -> list[T]:
     """
     Removes elements from `array` corresponding to the specified indexes and returns a list of the
     removed elements. Indexes may be specified as a list of indexes or as individual arguments.
@@ -2278,12 +2448,21 @@ def pull_at(array: List[T], *indexes: int) -> List[T]:
     idxs = list(indexes)
     if len(idxs) == 1 and isinstance(idxs[0], (list, tuple)):
         idxs = list(idxs[0])  # type: ignore
-    to_remove = set(i if i >= 0 else i + len(array) for i in idxs)
+    to_remove = {
+        i if i >= 0 else i + len(array)
+        for i in idxs
+        if 0 <= (i if i >= 0 else i + len(array)) < len(array)
+    }
+    if len(to_remove) <= 8:
+        result = array.copy()
+        for index in sorted(to_remove, reverse=True):
+            _list_pop(result, index)
+        return result
     return [x for i, x in enumerate(array) if i not in to_remove]
 
 
-def remove(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
-    removed: List[T] = []
+def remove(array: list[T], predicate: Callable[[T], bool]) -> list[T]:
+    removed: list[T] = []
     i = 0
     while i < len(array):
         if predicate(array[i]):
@@ -2294,8 +2473,8 @@ def remove(array: List[T], predicate: Callable[[T], bool]) -> List[T]:
 
 
 def slice_(
-    array: Union[List[T], str], start: int, end: Optional[int] = None
-) -> Union[List[T], str]:
+    array: list[T] | str, start: int, end: int | None = None
+) -> list[T] | str:
     """
     Return a portion of `array` from index `start` up to, but not including, `end`.
 
@@ -2320,13 +2499,13 @@ def slice_(
         # return single element at index
         try:
             return [array[start]]  # type: ignore
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
     return array[start:end]  # type: ignore
 
 
 def ft_reduce(
-    func: Callable[[U, T], U], iterable: Iterable[T], initializer: Optional[U] = None
+    func: Callable[[U, T], U], iterable: Iterable[T], initializer: U | None = None
 ) -> U:
     """
     Applies a rolling computation to sequential pairs of values in an iterable.
@@ -2404,11 +2583,11 @@ def ft_cmp_to_key(cmp: Callable[[Any, Any], int]):
 
 
 def sort(
-    array: List[Any],
-    comparator: Optional[Callable[[Any, Any], int]] = None,
-    key: Optional[Callable[[Any], Any]] = None,
+    array: list[Any],
+    comparator: Callable[[Any, Any], int] | None = None,
+    key: Callable[[Any], Any] | None = None,
     reverse: bool = False,
-) -> List[Any]:
+) -> list[Any]:
     """
     Sorts an array in-place and returns it.
 
@@ -2456,19 +2635,19 @@ def sort(
     try:
         if comparator is not None:
             # Convert comparator to key function for performance
-            array.sort(key=ft_cmp_to_key(comparator))
+            array.sort(key=_cmp_to_key(comparator))
         else:
             # Use built-in sort with optional key and reverse
             array.sort(key=key, reverse=reverse)
 
     except (TypeError, AttributeError) as e:
         # Security: Catch and re-raise with context
-        raise TypeError(f"Sort operation failed: {str(e)}")
+        raise TypeError(f"Sort operation failed: {e!s}")
 
     return array
 
 
-def intersection(array: List[T], *arrays: List[T]) -> List[T]:
+def intersection(array: list[T], *arrays: list[T]) -> list[T]:
     """
     Returns an array of values that are present in all arrays.
 
@@ -2479,6 +2658,11 @@ def intersection(array: List[T], *arrays: List[T]) -> List[T]:
     Returns:
         Intersection of provided lists.
 
+    Complexity:
+        O(n + m) expected time for hashable values, where `m` is the combined
+        size of the other arrays. Unhashable membership uses an
+        equality-preserving linear fallback.
+
     Examples:
 
         >>> intersection([1, 2, 3], [2, 3, 4])
@@ -2486,16 +2670,18 @@ def intersection(array: List[T], *arrays: List[T]) -> List[T]:
     """
     if not arrays:
         return array.copy()
-    result: List[T] = []
+    indexes = [_StableMembership(other) for other in arrays]
+    seen = _StableMembership()
+    result: list[T] = []
     for x in array:
-        if x in result:
+        if not seen.add(x):
             continue
-        if all(x in arr for arr in arrays):
+        if all(index.contains(x) for index in indexes):
             result.append(x)
     return result
 
 
-def intersection_by(array: List[T], *args) -> List[T]:
+def intersection_by(array: list[T], *args) -> list[T]:
     # last arg may be iteratee
     """
     Creates an array of unique values that is the intersection of all given arrays, using a provided iteratee to generate the criterion by which uniqueness is computed.
@@ -2508,12 +2694,16 @@ def intersection_by(array: List[T], *args) -> List[T]:
     Returns:
         The intersection of values.
 
+    Complexity:
+        O(n + m) expected time for hashable derived keys. Unhashable keys use
+        the equality-preserving fallback.
+
     Examples:
         >>> intersection_by([1, 2, 3], [2, 3, 4], lambda x: x % 2)
         [2]
     """
     iteratee = None
-    arrays: List[List[T]] = []
+    arrays: list[list[T]] = []
     if args and (callable(args[-1]) or isinstance(args[-1], str) or args[-1] is None):
         iteratee = args[-1]
         arrays = list(args[:-1])  # type: ignore
@@ -2526,28 +2716,38 @@ def intersection_by(array: List[T], *args) -> List[T]:
 
         def fn(x: T) -> Any:
             if isinstance(x, dict):
-                return x.get(iteratee)  # type: ignore  # noqa: E701
+                return x.get(iteratee)  # type: ignore
             return getattr(x, iteratee, None)  # type: ignore
     elif callable(iteratee):
         fn = iteratee  # type: ignore
     else:
-        fn = lambda x: x  # type: ignore  # noqa: E731
-    sets = [{fn(v) for v in arr} for arr in arrays]
-    seen: set = set()
-    result: List[T] = []
-    for x in array:
-        key_val = fn(x)
-        if key_val in seen:
-            continue
-        if all(key_val in s for s in sets):
-            seen.add(key_val)
-            result.append(x)
-    return result
+        fn = lambda x: x  # type: ignore
+    try:
+        indexes = [{fn(value) for value in other} for other in arrays]
+        seen: set[Any] = set()
+        result: list[T] = []
+        for value in array:
+            key_val = fn(value)
+            if key_val not in seen and all(key_val in index for index in indexes):
+                seen.add(key_val)
+                result.append(value)
+        return result
+    except TypeError:
+        indexes = [_StableMembership(fn(value) for value in other) for other in arrays]
+        seen_fallback = _StableMembership()
+        result = []
+        for value in array:
+            key_val = fn(value)
+            if seen_fallback.add(key_val) and all(
+                index.contains(key_val) for index in indexes
+            ):
+                result.append(value)
+        return result
 
 
 def unzip_with(
-    arrays: List[List[Any]], iteratee: Optional[Callable] = None
-) -> List[Any]:
+    arrays: list[list[Any]], iteratee: Callable | None = None
+) -> list[Any]:
     """
     This method is like unzip except that it accepts an iteratee to specify
     how regrouped values should be combined. The iteratee is invoked with the
@@ -2626,12 +2826,12 @@ def unzip_with(
                 result.append(transformed)
 
     except (TypeError, IndexError) as e:
-        raise TypeError(f"Failed to process arrays: {str(e)}")
+        raise TypeError(f"Failed to process arrays: {e!s}")
 
     return result
 
 
-def power(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
+def power(a: float, b: float) -> int | float:
     """
     Helper function to calculate a raised to the power of b.
     Used in the test cases for unzip_with.
@@ -2650,7 +2850,7 @@ def power(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
     return a**b
 
 
-def add(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
+def add(a: float, b: float) -> int | float:
     """
     Helper function to calculate a raised to the power of b.
     Used in the test cases for unzip_with.
@@ -2665,7 +2865,7 @@ def add(a: Union[int, float], b: Union[int, float]) -> Union[int, float]:
     return a + b
 
 
-def zip_with(*args) -> List[Any]:
+def zip_with(*args) -> list[Any]:
     """
     Merges together the values of each of the arrays with the
     corresponding values of the other arrays, based on their index.
@@ -2689,7 +2889,7 @@ def zip_with(*args) -> List[Any]:
     return list(zip(*arrays))
 
 
-def unshift(array: List[T], *values: T) -> List[T]:
+def unshift(array: list[T], *values: T) -> list[T]:
     """
     Adds elements to the beginning of an array.
 
@@ -2700,16 +2900,18 @@ def unshift(array: List[T], *values: T) -> List[T]:
     Returns:
         The modified array
 
+    Complexity:
+        O(n + m) for one stable in-place prefix update.
+
     Examples:
         >>> unshift([2, 3], 1)
         [1, 2, 3]
     """
-    for v in reversed(values):
-        array.insert(0, v)
+    array[:0] = values
     return array
 
 
-def xor(*arrays: List[T]) -> List[T]:
+def xor(*arrays: list[T]) -> list[T]:
     """
     Creates an array of unique values that is the symmetric difference of the provided arrays.
 
@@ -2719,20 +2921,24 @@ def xor(*arrays: List[T]) -> List[T]:
     Returns:
         A new array with unique values
 
+    Complexity:
+        O(n + m) expected time for two hashable inputs. N-way calls process
+        cumulative intermediate results. Unhashable membership uses an
+        equality-preserving quadratic worst-case fallback.
+
     Examples:
         >>> xor([1, 2, 3], [2, 3, 4])
         [1, 4]
     """
     if not arrays:
         return []
+    result: list[T] = []
+    for array in arrays:
+        result = _symmetric_difference(result, array)
+    return result
 
-    def sym(a, b):
-        return [x for x in a if x not in b] + [y for y in b if y not in a]
 
-    return ft_reduce(sym, arrays)
-
-
-def xor_by(*args: Any) -> List[T]:
+def xor_by(*args: Any) -> list[T]: # type: ignore
     """
     Creates an array of unique values that is the symmetric difference of the provided arrays.
 
@@ -2742,6 +2948,11 @@ def xor_by(*args: Any) -> List[T]:
 
     Returns:
         A new array with unique values
+
+    Complexity:
+        O(n + m) expected time for two inputs with hashable derived keys.
+        N-way calls process cumulative intermediate results. Unhashable keys
+        use the equality-preserving fallback.
 
     Examples:
         >>> xor_by([1, 2, 3], [2, 3, 4], lambda x: x % 2)
@@ -2753,15 +2964,13 @@ def xor_by(*args: Any) -> List[T]:
     else:
         raise TypeError("Missing iteratee for xor_by")
 
-    def sym(a, b):
-        kb = {fn(x) for x in b}
-        ka = {fn(x) for x in a}
-        return [x for x in a if fn(x) not in kb] + [y for y in b if fn(y) not in ka]
-
-    return ft_reduce(sym, arrays) if arrays else []
+    result: list[T] = []
+    for array in arrays:
+        result = _symmetric_difference(result, array, key=fn)
+    return result
 
 
-def xor_with(*args: Any) -> List[Any]:
+def xor_with(*args: Any) -> list[Any]:
     """
     Creates an array of unique values that is the symmetric difference of the provided arrays
     relative to the comparator function.
@@ -2779,6 +2988,10 @@ def xor_with(*args: Any) -> List[Any]:
     Returns:
         A new array with unique values.
 
+    Complexity:
+        Quadratic or greater depending on the number of arrays; custom
+        comparator contracts require pairwise comparisons.
+
     Examples:
         >>> xor_with([1, 2, 3], [2, 4], lambda x, y: x == y)
         [1, 3, 4]
@@ -2794,7 +3007,7 @@ def xor_with(*args: Any) -> List[Any]:
         raise TypeError("Last argument must be a callable comparator function")
 
     # Normalize & validate
-    lists: List[List[Any]] = []
+    lists: list[list[Any]] = []
     for i, arr in enumerate(arrays):
         if not isinstance(arr, (list, tuple)):
             raise TypeError(f"Argument {i} must be a list or tuple")
@@ -2804,21 +3017,21 @@ def xor_with(*args: Any) -> List[Any]:
     if len(lists) == 1:
         return lists[0].copy()
 
-    def _xor2(a: List[Any], b: List[Any]) -> List[Any]:
-        out: List[Any] = []
+    def _xor2(a: list[Any], b: list[Any]) -> list[Any]:
+        out: list[Any] = []
         # keep from a those x for which no y in b satisfies comparator(x,y)
         for x in a:
             try:
                 if not any(comparator(x, y) for y in b):
                     out.append(x)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 raise TypeError(f"Comparator function failed: {e}")
         # keep from b those y for which no x in a satisfies comparator(y,x)
         for y in b:
             try:
                 if not any(comparator(y, x) for x in a):
                     out.append(y)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 raise TypeError(f"Comparator function failed: {e}")
         return out
 

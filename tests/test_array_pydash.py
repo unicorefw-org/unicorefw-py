@@ -1,15 +1,15 @@
 #import unittest
-import pytest
-import sys
-import os
 import math
+import os
+import sys
+
+import pytest
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
-from unicorefw import _ # Now you can import Unicore as usual
-
+from unicorefw import _  # Now you can import Unicore as usual
 
 parametrize = pytest.mark.parametrize
 

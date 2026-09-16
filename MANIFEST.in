@@ -1,6 +1,9 @@
 include unicorefw/*.py
 include README.md
 include CHANGELOG.md
+include SECURITY.md
 include pyproject.toml
 recursive-include docs *.md
+recursive-include docs/api *.json
 recursive-include scripts *.py
+recursive-include security *.json

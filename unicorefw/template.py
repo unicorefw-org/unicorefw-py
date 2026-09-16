@@ -17,7 +17,7 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 import html
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from .security import (
     ResourceLimitError,
@@ -77,7 +77,7 @@ class TemplateLimits:
         )
 
 
-def _resolve_limits(limits: Optional[TemplateLimits]) -> TemplateLimits:
+def _resolve_limits(limits: TemplateLimits | None) -> TemplateLimits:
     if limits is None:
         return TemplateLimits()
     if not isinstance(limits, TemplateLimits):
@@ -137,7 +137,7 @@ def _validate_html_interpolation_contexts(template_str: str) -> None:
 
 def _render_template(
     template_str: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     *,
     autoescape: bool,
     limits: TemplateLimits,
@@ -202,7 +202,7 @@ def _render_template(
             len(token_matches),
         )
 
-    tokens: List[str] = []
+    tokens: list[str] = []
     cursor = 0
     for token_match in token_matches:
         tokens.append(template_str[cursor : token_match.start()])
@@ -211,7 +211,7 @@ def _render_template(
     tokens.append(template_str[cursor:])
 
     # Evaluate expressions in the template
-    def evaluate_expression(expr: str, ctx: Dict[str, Any]) -> Any:
+    def evaluate_expression(expr: str, ctx: dict[str, Any]) -> Any:
         """
         Evaluate a template expression.
 
@@ -249,7 +249,7 @@ def _render_template(
         return value
 
     # Evaluate conditions in the template
-    def evaluate_condition(condition: str, ctx: Dict[str, Any]) -> bool:
+    def evaluate_condition(condition: str, ctx: dict[str, Any]) -> bool:
         """
         Evaluate a template condition.
 
@@ -298,7 +298,7 @@ def _render_template(
             )
 
     # Process the template
-    output: List[str] = []
+    output: list[str] = []
     output_length = 0
     skip_stack = []  # Track conditional blocks
     idx = 0
@@ -371,9 +371,9 @@ def _render_template(
 
 def template(
     template_str: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     *,
-    limits: Optional[TemplateLimits] = None,
+    limits: TemplateLimits | None = None,
 ) -> str:
     """Render a trusted plain-text template under fixed resource budgets.
 
@@ -397,9 +397,9 @@ def template(
 
 def html_template(
     template_str: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     *,
-    limits: Optional[TemplateLimits] = None,
+    limits: TemplateLimits | None = None,
 ) -> str:
     """Render untrusted values into HTML text nodes with escaping enabled.
 

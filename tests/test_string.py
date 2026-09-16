@@ -10,15 +10,19 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.                      #
 #########################################################################################
 
-import unittest
-import sys
 import os
+import re
+import sys
+import unittest
 
 # Add the src directory to the Python path (adjust if needed)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
 from unicorefw import _  # Import UniCoreFW as usual
+from unicorefw.string import start_case as start_case_impl
+from unicorefw.string import url as url_impl
+
 
 class TestUniCoreFWStrings(unittest.TestCase):
     # -------------------- Basic String Utilities -------------------- #
@@ -58,10 +62,56 @@ class TestUniCoreFWStrings(unittest.TestCase):
         self.assertTrue(_.ends_with("Hello world", "world"))
         self.assertFalse(_.ends_with("Testing", "ing "))
 
+    def test_regex_boundaries_and_invalid_positions(self):
+        self.assertEqual(_.replace_start("foobar", re.compile("foo"), "x"), "xbar")
+        self.assertEqual(_.replace_end("foobar", re.compile("bar"), "x"), "foox")
+        self.assertTrue(_.starts_with("abc", "a", position="bad"))
+        self.assertTrue(_.ends_with("abc", "a", position="bad") is False)
+        self.assertEqual(_.prune("abcdef", "bad"), "...")
+        self.assertEqual(_.lower_case(None), "")
+
+    def test_case_truncation_repeat_and_regex_replacement_edges(self):
+        self.assertEqual(_.upper_case(None), "")
+        with self.assertRaises(ValueError):
+            _.truncate("abc", -1)
+        self.assertEqual(_.truncate("abcdef", 2, omission="..."), "..")
+        self.assertEqual(_.repeat("a", "bad"), "")
+        self.assertEqual(_.reg_exp_replace("abc", "", "-"), "-a-b-c-")
+        self.assertEqual(_.reg_exp_replace("abc", "[", "x"), "abc")
+        self.assertEqual(_.reg_exp_replace("abc", re.compile("b"), "x"), "axc")
+
+    def test_truncate_url_and_start_case_boundary_paths(self):
+        self.assertEqual(_.truncate("hello world", 8, separator=" "), "hello...")
+        self.assertEqual(_.truncate("hello-world", 8, separator=re.compile("-")), "hello...")
+        self.assertEqual(_.truncate("hello...", 7), "hell...")
+        self.assertEqual(_.truncate("hello,world", 9), "hello...")
+        self.assertEqual(_.url(), "")
+        self.assertEqual(_.url("http://example.com/a#frag", "b#next"), "http://example.com/a#frag/next")
+        self.assertEqual(_.url("http://example.com/a", "b/c"), "http://example.com/a/b/c")
+        self.assertEqual(_.url("http://example.com/a", "b/"), "http://example.com/a/b/")
+        self.assertEqual(_.start_case("---"), "")
+        self.assertEqual(start_case_impl("__--"), "")
+        self.assertEqual(url_impl("http://example.com/a#frag", "b"), "http://example.com/a#frag/b")
+        self.assertEqual(url_impl("http://example.com/a#frag", ""), "http://example.com/a#frag")
+        self.assertEqual(url_impl("http://example.com/a", "?q=1/"), "http://example.com/a/?q=1%2F")
+        self.assertEqual(start_case_impl("___"), "")
+
     def test_words(self):
         self.assertEqual(_.words("Hello, world!"), ["Hello", "world"])
         self.assertEqual(_.words("Hello  world", r"\W+"), ["Hello", "world"])
         self.assertEqual(_.words(""), [])
+
+    def test_string_boundary_and_regex_helpers(self):
+        self.assertEqual(_.predecessor(None), "")
+        self.assertEqual(_.successor(""), "")
+        self.assertFalse(_.has_substr("abc", "a", "bad"))
+        self.assertEqual(_.replace_start("abc", None, "x"), "xabc")
+        self.assertEqual(_.replace_end("abc", None, "x"), "abc")
+        self.assertEqual(_.insert_substr("abc", "bad", "X"), "Xabc")
+        self.assertEqual(_.insert_substr("abc", -1, "X"), "Xabc")
+        self.assertEqual(_.unquote("'value'", "\""), "'value'")
+        self.assertEqual(_.reg_exp_js_match("abc", "/[/"), [])
+        self.assertEqual(_.reg_exp_js_replace("abc", "/[/", "x"), "abc")
 
     def test_humanize(self):
         self.assertEqual(
@@ -80,7 +130,7 @@ class TestUniCoreFWStrings(unittest.TestCase):
 
     def test_chain_usage(self):
         result = (
-            _("Hello world")
+            _("Hello world") # type: ignore
             .snake_case()  # "hello_world"
             .regex_replace(r"_", "-", 0)  # "hello-world"
             .reverse()  # "dlrow-olleh"

@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
 
 from unicorefw.db import (
     Database,
@@ -131,7 +136,9 @@ def test_bandit_sql_exceptions_are_narrow_and_documented():
     assert len(suppressions) == 11
     assert all(
         any(
-            line.lstrip().startswith("# Bandit B608 review:")
+            line.lstrip().startswith(
+                "# Security suppression: codes=B608; expires="
+            )
             for line in lines[max(0, index - 2) : index]
         )
         for index in suppressions
@@ -173,8 +180,8 @@ def test_query_builder_supports_null_predicate_and_safe_join():
         lambda: QueryBuilder().having("COUNT(*) > 0; DROP TABLE users; --"),
         lambda: QueryBuilder().order_by("id; DROP TABLE users; --"),
         lambda: QueryBuilder().order_by("id", "ASC; DROP TABLE users; --"),
-        lambda: QueryBuilder().limit("1; DROP TABLE users; --"),
-        lambda: QueryBuilder().offset("0; DROP TABLE users; --"),
+        lambda: QueryBuilder().limit("1; DROP TABLE users; --"), # type: ignore
+        lambda: QueryBuilder().offset("0; DROP TABLE users; --"), # type: ignore
     ],
 )
 def test_query_builder_rejects_raw_injection_fragments(build):

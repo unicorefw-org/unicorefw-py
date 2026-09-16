@@ -12,7 +12,7 @@ relative_files = true
 source = ["unicorefw"]
 
 [tool.coverage.report]
-fail_under = 77
+fail_under = 83.0
 precision = 2
 show_missing = true
 skip_covered = false
@@ -22,3 +22,9 @@ output = "coverage.xml"
 
 [tool.coverage.json]
 output = "coverage.json"
+
+[tool.pytest.ini_options]
+markers = [
+    "database_integration: requires dedicated loopback PostgreSQL and MySQL services",
+    "redis_integration: requires a dedicated loopback Redis service",
+]

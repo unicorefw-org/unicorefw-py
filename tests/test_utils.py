@@ -10,15 +10,19 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
 ##############################################################################
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
 from unicorefw import UniCoreFW, _  # Now you can import Unicore as usual
+from unicorefw.security import ResourceLimitError
+from unicorefw.utils import decompress, memoize, mixin
+from unicorefw.utils import now as now_impl
+
 
 class TestUnicoreUtilities(unittest.TestCase):
     def test_chain(self):
@@ -62,6 +66,39 @@ class TestUnicoreUtilities(unittest.TestCase):
         self.assertEqual(
             UniCoreFW.custom_method(3), 6, "Custom method should function correctly"
         )
+        mixin({"ignored_value": 42})
+        self.assertFalse(hasattr(UniCoreFW, "ignored_value"))
+
+    def test_memoize_expiry_and_decompress_output_boundary(self):
+        clock = [0.0]
+        calls = []
+
+        def calculate(value):
+            calls.append(value)
+            return value
+
+        cached = memoize(calculate, ttl_seconds=1, clock=lambda: clock[0])
+        self.assertEqual(cached(1), 1)
+        clock[0] = 2
+        self.assertEqual(cached(1), 1)
+        self.assertEqual(calls, [1, 1])
+        with self.assertRaises(ResourceLimitError):
+            decompress("2a", max_output_length=1)
+        with self.assertRaises(ResourceLimitError):
+            decompress("1a1b", max_output_length=1)
+
+    def test_memoize_expiry_after_recomputation_and_digit_only_input(self):
+        clock = [0.0]
+
+        def calculate(value):
+            if value == 1:
+                clock[0] = 2.0
+            return value
+
+        cached = memoize(calculate, ttl_seconds=1, clock=lambda: clock[0])
+        self.assertEqual(cached(1), 1)
+        self.assertEqual(cached(1), 1)
+        self.assertEqual(decompress("123"), "")
 
     def test_noop(self):
         self.assertIsNone(_.noop(), "Noop should return None")
@@ -73,6 +110,7 @@ class TestUnicoreUtilities(unittest.TestCase):
         now = _.now()
         after = int(time.time() * 1000)
         self.assertTrue(before <= now <= after, "Should return the current timestamp")
+        self.assertIsInstance(now_impl(), int)
 
     def test_random(self):
         result = _.random(1, 10)

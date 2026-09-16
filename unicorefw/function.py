@@ -15,18 +15,17 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 import threading
 import time
-from typing import Callable, TypeVar, Any, List, Optional
-from queue import Queue
-from .supporter import (
-    _copy_function_metadata,
-    _validate_callable,
-    _try_import,
-    _try_asyncio_schedule
-)
+from collections.abc import Callable
+from typing import Any, TypeVar
+
 from .security import (
     ResourceLimitError,
     _validate_resource_duration,
     _validate_resource_limit,
+)
+from .supporter import (
+    _copy_function_metadata,
+    _validate_callable,
 )
 
 T = TypeVar("T")
@@ -171,7 +170,7 @@ def debounce(
                     with lock:
                         timer = None
                     func(*args, **kwargs)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return
 
             timer = timer_budget.schedule(wait_seconds, safe_call)
@@ -245,7 +244,7 @@ def compose(*funcs: Callable) -> Callable:
     return composed
 
 
-def invoke(array: List[Any], func_name: str, *args) -> List[Any]:
+def invoke(array: list[Any], func_name: str, *args) -> list[Any]:
     """
     Call a method on each item in an array.
 
@@ -515,7 +514,7 @@ def flip(func: Callable) -> Callable:
         return func(*reversed(args), **kwargs)
     return _copy_function_metadata(wrapper, func)
 
-def ary(func: Callable, n: Optional[int] = None) -> Callable:
+def ary(func: Callable, n: int | None = None) -> Callable:
     """
     Create a function that accepts up to n arguments, ignoring additional ones.
     
@@ -669,7 +668,7 @@ def juxtapose(*functions: Callable) -> Callable:
     return parallel
 
 
-def enhanced_curry(func: Callable, arity: Optional[int] = None) -> Callable:
+def enhanced_curry(func: Callable, arity: int | None = None) -> Callable:
     """
     Enhanced curry function with explicit arity support and _argcount tracking.
     
@@ -708,7 +707,7 @@ def enhanced_curry(func: Callable, arity: Optional[int] = None) -> Callable:
     return _copy_function_metadata(curried, func)
 
 
-def enhanced_curry_right(func: Callable, arity: Optional[int] = None) -> Callable:
+def enhanced_curry_right(func: Callable, arity: int | None = None) -> Callable:
     """
     Enhanced curry_right with explicit arity support and _argcount tracking.
     
@@ -815,7 +814,7 @@ def enhanced_partial_right(func: Callable, *bound_args, **bound_kwargs) -> Calla
 def enhanced_debounce(
     func: Callable,
     wait: int,
-    max_wait: Optional[int] = None,
+    max_wait: int | None = None,
     *,
     max_pending_timers: int = _DEFAULT_MAX_PENDING_TIMERS,
 ) -> Callable:
@@ -954,7 +953,7 @@ def debounce_(
     func: Callable,
     wait: int,
     *,
-    max_wait: Optional[int] = None,
+    max_wait: int | None = None,
     use_main_thread: bool = False,
     max_pending_timers: int = _DEFAULT_MAX_PENDING_TIMERS,
 ) -> Callable:
@@ -1131,7 +1130,7 @@ def filter_(iterable, predicate):
     """
     return [item for item in iterable if predicate(item)]
 
-def after(a: Any, b: Any) -> Callable[..., Optional[R]]:
+def after(a: Any, b: Any) -> Callable[..., R | None]: # type: ignore
     """
     Create a function that only invokes the provided function after it has been
     called a specified number of times.
@@ -1166,7 +1165,7 @@ def after(a: Any, b: Any) -> Callable[..., Optional[R]]:
         raise TypeError("after expects (func, int) or (int, func)")
 
     count = [0]
-    def wrapper(*args: Any, **kwargs: Any) -> Optional[R]:
+    def wrapper(*args: Any, **kwargs: Any) -> R | None:
         count[0] += 1
         if count[0] >= max(times, 1):
             return func(*args, **kwargs) # type: ignore
@@ -1177,7 +1176,7 @@ def after(a: Any, b: Any) -> Callable[..., Optional[R]]:
     wrapper.__wrapped__ = func # type: ignore
     return wrapper
 
-def before(a: Any, b: Any) -> Callable[..., Optional[R]]:
+def before(a: Any, b: Any) -> Callable[..., R | None]: # type: ignore
     """
     Create a wrapper that limits how many times a function can run.
 
@@ -1226,7 +1225,7 @@ def before(a: Any, b: Any) -> Callable[..., Optional[R]]:
     limit = max(times - 1, 0)
     calls = [0]
 
-    def wrapper(*args: Any, **kwargs: Any) -> Optional[R]:
+    def wrapper(*args: Any, **kwargs: Any) -> R | None:
         if calls[0] < limit:
             calls[0] += 1
             return func(*args, **kwargs) # type: ignore
@@ -1238,7 +1237,7 @@ def before(a: Any, b: Any) -> Callable[..., Optional[R]]:
     return wrapper
 
 
-def allany(*preds: Callable[[Any], bool]) -> Callable[[List[Any]], bool]:
+def allany(*preds: Callable[[Any], bool]) -> Callable[[list[Any]], bool]:
 
     """
     Returns a function that checks if any of the given predicates return True for
@@ -1261,7 +1260,7 @@ def allany(*preds: Callable[[Any], bool]) -> Callable[[List[Any]], bool]:
         >>> is_even_and_positive([2, 4, 6])  # True
         >>> is_even_and_positive([1, 3, 5])  # False
     """
-    def tester(arr: List[Any]) -> bool:
+    def tester(arr: list[Any]) -> bool:
         for x in arr:
             if not any(p(x) for p in preds):
                 return False

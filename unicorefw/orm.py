@@ -23,21 +23,28 @@ Notes
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Iterator, Optional
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 
 SQLALCHEMY_AVAILABLE = False
-_SQLALCHEMY_IMPORT_ERROR: Optional[BaseException] = None
+_SQLALCHEMY_IMPORT_ERROR: BaseException | None = None
 _MISSING_SQLALCHEMY_MESSAGE = (
-    "SQLAlchemy is required for unicorefw.orm. Install it with 'pip install sqlalchemy'."
+    "SQLAlchemy is required for unicorefw.orm. Install it with "
+    "'pip install unicorefw[orm]'."
 )
+
+
+class ORMUnavailableError(ImportError):
+    """Raised when the optional SQLAlchemy backend is unavailable."""
 
 
 def _require_sqlalchemy() -> Any:
     try:
-        import sqlalchemy as sa  # noqa: F401
+        import sqlalchemy as sa
         return sa
-    except Exception as e:  # pragma: no cover
-        raise ImportError(_MISSING_SQLALCHEMY_MESSAGE) from e
+    except ImportError as exc:
+        raise ORMUnavailableError(_MISSING_SQLALCHEMY_MESSAGE) from exc
 
 
 class _MissingSQLAlchemySymbol:
@@ -47,10 +54,14 @@ class _MissingSQLAlchemySymbol:
         self.__name__ = name
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        raise ImportError(_MISSING_SQLALCHEMY_MESSAGE) from _SQLALCHEMY_IMPORT_ERROR
+        raise ORMUnavailableError(
+            _MISSING_SQLALCHEMY_MESSAGE
+        ) from _SQLALCHEMY_IMPORT_ERROR
 
     def __getattr__(self, item: str) -> Any:
-        raise ImportError(_MISSING_SQLALCHEMY_MESSAGE) from _SQLALCHEMY_IMPORT_ERROR
+        raise ORMUnavailableError(
+            _MISSING_SQLALCHEMY_MESSAGE
+        ) from _SQLALCHEMY_IMPORT_ERROR
 
     def __repr__(self) -> str:
         return f"<missing SQLAlchemy symbol {self.__name__!r}>"
@@ -66,6 +77,8 @@ try:
     SQLALCHEMY_AVAILABLE = True
 
     from sqlalchemy import (  # type: ignore
+        ARRAY,
+        JSON,
         Boolean,
         CheckConstraint,
         Column,
@@ -74,6 +87,7 @@ try:
         Enum,
         Float,
         ForeignKey,
+        Index,
         Integer,
         LargeBinary,
         Numeric,
@@ -81,27 +95,23 @@ try:
         Text,
         Time,
         UniqueConstraint,
-        Index,
-        ARRAY,
-        JSON,
-        select,
         and_,
-        or_,
         asc,
-        desc,
-        insert,
-        update,
-        delete,
         bindparam,
-        text,
+        delete,
+        desc,
         func,
+        insert,
+        or_,
+        select,
+        text,
+        update,
     )
-
     from sqlalchemy.orm import (  # type: ignore
         Session,
         relationship,
-        sessionmaker,
         selectinload,
+        sessionmaker,
     )
 
     # Declarative base (works for both SQLAlchemy 1.4/2.x)
@@ -111,8 +121,8 @@ try:
         class Base(DeclarativeBase):
             pass
 
-    except Exception:  # pragma: no cover
-        from sqlalchemy.ext.declarative import declarative_base  # type: ignore
+    except ImportError:
+        from sqlalchemy.orm import declarative_base  # type: ignore
 
         Base = declarative_base()
 
@@ -133,7 +143,7 @@ try:
 except ImportError as exc:
     _SQLALCHEMY_IMPORT_ERROR = exc
     sa = None
-    Base = _missing_symbol("Base")
+    Base = _missing_symbol("Base") # type: ignore
     AsyncEngine = _missing_symbol("AsyncEngine")
     AsyncSession = _missing_symbol("AsyncSession")
     Session = _missing_symbol("Session")
@@ -180,11 +190,11 @@ def create_async_engine_from_url(
     echo: bool = False,
     pool_pre_ping: bool = True,
     pool_recycle: int = 3600,
-    pool_size: Optional[int] = None,
-    max_overflow: Optional[int] = None,
-    connect_args: Optional[dict[str, Any]] = None,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    connect_args: dict[str, Any] | None = None,
     future: bool = True,
-) -> AsyncEngine:
+) -> AsyncEngine: # type: ignore
     """Create an AsyncEngine with hardened defaults.
 
     - `pool_pre_ping=True` avoids stale-connection failures.
@@ -212,10 +222,10 @@ def create_async_engine_from_url(
 
 
 def create_async_sessionmaker(
-    engine: AsyncEngine,
+    engine: AsyncEngine, # type: ignore
     *,
     expire_on_commit: bool = False,
-) -> async_sessionmaker[AsyncSession]:
+) -> async_sessionmaker[AsyncSession]: # type: ignore
     """Create an async session factory with safe defaults."""
     _require_sqlalchemy()
 
@@ -226,18 +236,10 @@ def create_async_sessionmaker(
     )
 
 
-async def session_scope(
-    session_factory: async_sessionmaker[AsyncSession],
-) -> AsyncIterator[AsyncSession]:
-    """Async context helper for request-scoped unit-of-work.
-
-    Usage:
-        async with session_scope(AsyncSessionLocal) as session:
-            ...
-
-    Guarantees rollback on error.
-    """
-
+@asynccontextmanager
+async def _session_scope_context(
+    session_factory: async_sessionmaker[AsyncSession], # type: ignore
+) -> AsyncIterator[AsyncSession]: # type: ignore
     async with session_factory() as session:
         try:
             yield session
@@ -246,12 +248,63 @@ async def session_scope(
             raise
 
 
+class _AsyncSessionScope:
+    """One-shot async context manager with legacy async-iterator support."""
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]): # type: ignore
+        self._context = _session_scope_context(session_factory)
+        self._iterator: AsyncGenerator[AsyncSession, None] | None = None # type: ignore
+
+    async def __aenter__(self) -> AsyncSession: # type: ignore
+        return await self._context.__aenter__()
+
+    async def __aexit__(
+        self,
+        exc_type: Any,  # noqa: PYI036
+        exc_value: Any,  # noqa: PYI036
+        traceback: Any,  # noqa: PYI036
+    ) -> Any:
+        return await self._context.__aexit__(exc_type, exc_value, traceback)
+
+    def __aiter__(self) -> _AsyncSessionScope:
+        if self._iterator is None:
+            self._iterator = self._iterate()
+        return self
+
+    async def __anext__(self) -> AsyncSession: # type: ignore
+        iterator = self._iterator
+        if iterator is None:
+            iterator = self._iterate()
+            self._iterator = iterator
+        return await iterator.__anext__()
+
+    async def aclose(self) -> None:
+        if self._iterator is not None:
+            await self._iterator.aclose()
+
+    async def _iterate(self) -> AsyncGenerator[AsyncSession, None]: # type: ignore
+        async with self as session:
+            yield session
+
+
+def session_scope(
+    session_factory: async_sessionmaker[AsyncSession], # type: ignore
+) -> _AsyncSessionScope:
+    """Create a request-scoped async unit-of-work context.
+
+    The context rolls back when the caller raises. Existing ``async for``
+    consumption remains available for compatibility, but new code should use
+    ``async with`` so exceptions from the body reach the rollback boundary.
+    """
+    return _AsyncSessionScope(session_factory)
+
+
 def create_sync_sessionmaker(
     engine_sync: Any,
     *,
     autocommit: bool = False,
     autoflush: bool = False,
-) -> sessionmaker[Session]:
+) -> sessionmaker[Session]: # type: ignore
     """Create a synchronous sessionmaker.
 
     Use this for offline scripts or background jobs. Avoid using synchronous
@@ -265,19 +318,13 @@ def create_sync_sessionmaker(
 # --- Public exports ----------------------------------------------------------
 
 __all__ = [
-    # base
-    "Base",
+    "ARRAY",
+    "JSON",
     # engine/session
     "AsyncEngine",
     "AsyncSession",
-    "async_sessionmaker",
-    "create_async_engine",
-    "create_async_engine_from_url",
-    "create_async_sessionmaker",
-    "session_scope",
-    "Session",
-    "sessionmaker",
-    "create_sync_sessionmaker",
+    # base
+    "Base",
     # sql primitives
     "Boolean",
     "CheckConstraint",
@@ -287,28 +334,35 @@ __all__ = [
     "Enum",
     "Float",
     "ForeignKey",
+    "Index",
     "Integer",
     "LargeBinary",
     "Numeric",
+    "ORMUnavailableError",
+    "Session",
     "String",
     "Text",
     "Time",
     "UniqueConstraint",
-    "Index",
-    "ARRAY",
-    "JSON",
-    "select",
     "and_",
-    "or_",
     "asc",
-    "desc",
-    "insert",
-    "update",
-    "delete",
+    "async_sessionmaker",
     "bindparam",
-    "text",
+    "create_async_engine",
+    "create_async_engine_from_url",
+    "create_async_sessionmaker",
+    "create_sync_sessionmaker",
+    "delete",
+    "desc",
     "func",
+    "insert",
+    "or_",
     # orm
     "relationship",
+    "select",
     "selectinload",
+    "session_scope",
+    "sessionmaker",
+    "text",
+    "update",
 ]

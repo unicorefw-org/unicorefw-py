@@ -30,9 +30,10 @@ import threading
 import time
 import zipfile
 from collections import OrderedDict
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from .security import (
     InputValidationError,
@@ -42,42 +43,43 @@ from .security import (
     _validate_resource_limit,
     _validate_resource_ratio,
 )
+
 # from pathlib import Path
 
 # Optional imports for additional database support
 try:
-    import psycopg2 # type: ignore
-    import psycopg2.extras # type: ignore
+    import psycopg2  # type: ignore
+    import psycopg2.extras  # type: ignore
     POSTGRES_AVAILABLE = True
 except ImportError:
     POSTGRES_AVAILABLE = False
 
 try:
-    import pymysql # type: ignore
+    import pymysql  # type: ignore
     MYSQL_AVAILABLE = True
 except ImportError:
     MYSQL_AVAILABLE = False
 
 try:
-    import pymongo # type: ignore
+    import pymongo  # type: ignore
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
 
 try:
-    import redis # type: ignore
+    import redis  # type: ignore
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
 
 try:
-    import pandas as pd # type: ignore
+    import pandas as pd  # type: ignore
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
 
 try:
-    import openpyxl # type: ignore  # noqa: F401
+    import openpyxl  # type: ignore  # noqa: F401
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
@@ -87,27 +89,28 @@ _ordered_dict_clear = OrderedDict.clear
 
 class DatabaseError(Exception):
     """Base exception for database-related errors."""
-    pass
 
 
-class ConnectionError(DatabaseError):
+class DatabaseConnectionError(DatabaseError):
     """Raised when database connection fails."""
-    pass
 
 
 class QueryError(DatabaseError):
     """Raised when query execution fails."""
-    pass
 
 
 class ExportError(DatabaseError):
     """Raised when data export fails."""
-    pass
 
 
-class ImportError(DatabaseError):
+class DatabaseImportError(DatabaseError):
     """Raised when data import fails."""
-    pass
+
+
+
+# Backward-compatible aliases for the original built-in-shadowing names.
+ConnectionError = DatabaseConnectionError
+ImportError = DatabaseImportError
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Security-first SQL identifier handling
@@ -234,7 +237,7 @@ def _validate_ident(name: str) -> None:
         raise DatabaseError(f"Unsafe SQL identifier: {name!r}")
 
 
-def _split_table(table: str) -> List[str]:
+def _split_table(table: str) -> list[str]:
     if not isinstance(table, str) or not table:
         raise DatabaseError("Table name must be a non-empty string")
     parts = table.split(".")
@@ -272,7 +275,7 @@ def _qfield(engine: str, field: str) -> str:
     return ".".join(rendered)
 
 
-def _render_sql_field(engine: str, field: Union[str, UnsafeSQL]) -> str:
+def _render_sql_field(engine: str, field: str | UnsafeSQL) -> str:
     if isinstance(field, UnsafeSQL):
         return field.sql
     return _qfield(engine, field)
@@ -284,9 +287,9 @@ def _sql_placeholder(engine: str) -> str:
 
 def _compile_sql_condition(
     engine: str,
-    condition: Union[str, UnsafeSQL],
-    params: Tuple[Any, ...],
-) -> Tuple[str, Tuple[Any, ...]]:
+    condition: str | UnsafeSQL,
+    params: tuple[Any, ...],
+) -> tuple[str, tuple[Any, ...]]:
     if isinstance(condition, UnsafeSQL):
         return condition.sql, params
     if not isinstance(condition, str):
@@ -325,7 +328,7 @@ def _compile_sql_condition(
 
 
 def _compile_sql_join(
-    engine: str, condition: Union[str, UnsafeSQL]
+    engine: str, condition: str | UnsafeSQL
 ) -> str:
     if isinstance(condition, UnsafeSQL):
         return condition.sql
@@ -394,7 +397,7 @@ def _bounded_text_reader(
     max_bytes: int,
     resource: str,
     *,
-    newline: Optional[str] = None,
+    newline: str | None = None,
 ):
     """Decode UTF-8 through a byte-counting stream."""
     with open(file_path, "rb") as source:
@@ -478,7 +481,7 @@ def _validate_zip_expansion(
 
 
 def _validate_import_records(
-    records: List[Dict],
+    records: list[dict],
     *,
     max_rows: int,
     max_columns: int,
@@ -513,6 +516,16 @@ def _text_file_path(file_path: str) -> str:
     return raw_path
 
 
+def _raise_import_failure(format_name: str, error: Exception) -> None:
+    """Preserve public validation errors and redact unexpected import details."""
+    if isinstance(
+        error,
+        (InputValidationError, ResourceLimitError, DatabaseImportError),
+    ):
+        raise error
+    raise DatabaseImportError(f"{format_name} import failed") from error
+
+
 def _absolute_file_path(file_path: str) -> str:
     path = os.path.abspath(_text_file_path(file_path))
 
@@ -523,7 +536,7 @@ def _absolute_file_path(file_path: str) -> str:
 
 
 @contextmanager
-def _atomic_text_writer(file_path: str, newline: Optional[str] = "\n"):
+def _atomic_text_writer(file_path: str, newline: str | None = "\n"):
     """Write UTF-8 text through a mode-0600 temporary file and atomic replace."""
     destination = _absolute_file_path(file_path)
     directory = os.path.dirname(destination) or os.curdir
@@ -650,10 +663,10 @@ def _decode_json_backup_value(value: Any) -> Any:
 
 def _sqlite_restore_authorizer(
     action: int,
-    argument1: Optional[str],
-    argument2: Optional[str],
-    database_name: Optional[str],
-    trigger_name: Optional[str],
+    argument1: str | None,
+    argument2: str | None,
+    database_name: str | None,
+    trigger_name: str | None,
 ) -> int:
     """Prevent a restore script from attaching files or changing schema trust."""
     del argument2, database_name, trigger_name
@@ -666,6 +679,92 @@ def _sqlite_restore_authorizer(
     }:
         return sqlite3.SQLITE_DENY
     return sqlite3.SQLITE_OK
+
+
+def _sqlite_script_statements(script: str) -> list[str]:
+    """Split a SQLite script without breaking quoted strings or trigger bodies."""
+    statements: list[str] = []
+    buffer: list[str] = []
+    for character in script:
+        buffer.append(character)
+        if character != ";":
+            continue
+        candidate = "".join(buffer)
+        if sqlite3.complete_statement(candidate):
+            if candidate.strip():
+                statements.append(candidate)
+            buffer = []
+
+    trailing = "".join(buffer)
+    if trailing.strip():
+        statements.append(trailing)
+    return statements
+
+
+def _mysql_script_statements(script: str) -> list[str]:
+    """Split a MySQL script while preserving quoted and commented semicolons."""
+    statements: list[str] = []
+    buffer: list[str] = []
+    state = "normal"
+    quote = ""
+    index = 0
+
+    while index < len(script):
+        character = script[index]
+        following = script[index + 1] if index + 1 < len(script) else ""
+        buffer.append(character)
+
+        if state == "line_comment":
+            if character in "\r\n":
+                state = "normal"
+        elif state == "block_comment":
+            if character == "*" and following == "/":
+                buffer.append(following)
+                index += 1
+                state = "normal"
+        elif state == "quoted":
+            if character == "\\" and following:
+                buffer.append(following)
+                index += 1
+            elif character == quote:
+                if following == quote:
+                    buffer.append(following)
+                    index += 1
+                else:
+                    state = "normal"
+                    quote = ""
+        elif character in {"'", '"', "`"}:
+            state = "quoted"
+            quote = character
+        elif character == "#":
+            state = "line_comment"
+        elif (
+            character == "-"
+            and following == "-"
+            and (
+                index + 2 >= len(script)
+                or script[index + 2].isspace()
+            )
+        ):
+            buffer.append(following)
+            index += 1
+            state = "line_comment"
+        elif character == "/" and following == "*":
+            buffer.append(following)
+            index += 1
+            state = "block_comment"
+        elif character == ";":
+            candidate = "".join(buffer)
+            if candidate.strip():
+                statements.append(candidate)
+            buffer = []
+
+        index += 1
+
+    trailing = "".join(buffer)
+    if trailing.strip():
+        statements.append(trailing)
+    return statements
 
 
 @contextmanager
@@ -697,8 +796,13 @@ class ConnectionPool:
             factory: Callable that creates a new connection
             max_connections: Maximum number of connections in pool
         """
+        if not callable(factory):
+            raise DatabaseConnectionError("Connection factory must be callable")
         self.factory = factory
-        self.max_connections = max_connections
+        self.max_connections = _validate_positive_int(
+            max_connections,
+            "max_connections",
+        )
         self.pool = []
         self.in_use = set()
         self._lock = threading.Lock()
@@ -718,10 +822,32 @@ class ConnectionPool:
             if self.pool:
                 conn = self.pool.pop()
             elif len(self.in_use) < self.max_connections:
-                conn = self.factory()
+                try:
+                    conn = self.factory()
+                except Exception as exc:
+                    raise DatabaseConnectionError(
+                        "Connection factory failed"
+                    ) from exc
+                if conn is None:
+                    raise DatabaseConnectionError(
+                        "Connection factory returned no connection"
+                    )
             else:
-                raise ConnectionError("Connection pool exhausted")
-            self.in_use.add(conn)
+                raise DatabaseConnectionError("Connection pool exhausted")
+            try:
+                self.in_use.add(conn)
+            except Exception as exc:
+                shutdown = getattr(conn, "close", None)
+                if callable(shutdown):
+                    try:
+                        shutdown()
+                    except Exception as cleanup_error:
+                        raise DatabaseConnectionError(
+                            "Pooled connection validation and cleanup failed"
+                        ) from cleanup_error
+                raise DatabaseConnectionError(
+                    "Pooled connection must be hashable"
+                ) from exc
             return conn
     
     def _release(self, conn):
@@ -731,17 +857,35 @@ class ConnectionPool:
             if len(self.pool) < self.max_connections:
                 self.pool.append(conn)
             else:
-                conn.close()
+                try:
+                    conn.close()
+                except Exception as exc:
+                    raise DatabaseConnectionError(
+                        "Failed to close excess pooled connection"
+                    ) from exc
     
     def close_all(self):
         """Close all connections in the pool."""
         with self._lock:
-            for conn in self.pool:
-                conn.close()
+            connections = list(self.pool)
+            connections.extend(self.in_use)
             self.pool.clear()
-            for conn in self.in_use:
-                conn.close()
             self.in_use.clear()
+            first_error = None
+            seen_resources = set()
+            for conn in connections:
+                if id(conn) in seen_resources:
+                    continue
+                seen_resources.add(id(conn))
+                try:
+                    conn.close()
+                except Exception as exc:  # noqa: BLE001
+                    if first_error is None:
+                        first_error = exc
+            if first_error is not None:
+                raise DatabaseConnectionError(
+                    "Failed to close one or more pooled connections"
+                ) from first_error
 
 
 class Database:
@@ -749,65 +893,177 @@ class Database:
     Main database interface supporting multiple database engines.
     """
     
-    def __init__(self, engine: str = "sqlite", **kwargs):
+    def __init__(
+        self,
+        engine: str = "sqlite",
+        *,
+        unsafe_allow_cross_thread: bool = False,
+        **kwargs,
+    ):
         """
         Initialize database connection.
         
         Args:
             engine: Database engine ('sqlite', 'postgres', 'mysql', 'mongodb', 'redis')
+            unsafe_allow_cross_thread: Disable the creating-thread check. The
+                caller must configure the driver for cross-thread use and
+                serialize every operation on this instance.
             **kwargs: Engine-specific connection parameters
         """
+        if not isinstance(engine, str) or not engine:
+            raise DatabaseError("Database engine must be a non-empty string")
+        if not isinstance(unsafe_allow_cross_thread, bool):
+            raise DatabaseError("unsafe_allow_cross_thread must be a boolean")
         self.engine = engine.lower()
         self.connection = None
         self.cursor = None
+        self._driver_owner = None
         self._config = kwargs
         self._pool = None
         self._transaction_active = False
-        self._prev_autocommit: Optional[bool] = None
-        
+        self._transaction_depth = 0
+        self._savepoint_counter = 0
+        self._savepoints: list[str] = []
+        self._prev_autocommit: bool | None = None
+        self._owner_process_id = os.getpid()
+        self._owner_thread = threading.current_thread()
+        self._unsafe_allow_cross_thread = unsafe_allow_cross_thread
+
         # Initialize based on engine
-        if self.engine == "sqlite":
-            self._init_sqlite(**kwargs)
-        elif self.engine == "postgres" and POSTGRES_AVAILABLE:
-            self._init_postgres(**kwargs)
-        elif self.engine == "mysql" and MYSQL_AVAILABLE:
-            self._init_mysql(**kwargs)
-        elif self.engine == "mongodb" and MONGODB_AVAILABLE:
-            self._init_mongodb(**kwargs)
-        elif self.engine == "redis" and REDIS_AVAILABLE:
-            self._init_redis(**kwargs)
-        else:
-            raise DatabaseError(f"Unsupported or unavailable engine: {engine}")
-    
+        try:
+            if self.engine == "sqlite":
+                self._init_sqlite(**kwargs)
+            elif self.engine == "postgres" and POSTGRES_AVAILABLE:
+                self._init_postgres(**kwargs)
+            elif self.engine == "mysql" and MYSQL_AVAILABLE:
+                self._init_mysql(**kwargs)
+            elif self.engine == "mongodb" and MONGODB_AVAILABLE:
+                self._init_mongodb(**kwargs)
+            elif self.engine == "redis" and REDIS_AVAILABLE:
+                self._init_redis(**kwargs)
+            else:
+                raise DatabaseError(
+                    f"Unsupported or unavailable engine: {engine}"
+                )
+        except DatabaseError:
+            raise
+        except Exception as exc:
+            raise DatabaseConnectionError(
+                f"Failed to initialize {self.engine} database"
+            ) from exc
+
+    @staticmethod
+    def _close_initialization_resources(*resources: Any) -> None:
+        """Close partial driver resources and retain the first cleanup error."""
+        first_error = None
+        seen_resources = set()
+        for resource in resources:
+            if resource is None or id(resource) in seen_resources:
+                continue
+            seen_resources.add(id(resource))
+            shutdown = getattr(resource, "close", None)
+            if not callable(shutdown):
+                continue
+            try:
+                shutdown()
+            except Exception as exc:  # noqa: BLE001
+                if first_error is None:
+                    first_error = exc
+        if first_error is not None:
+            raise DatabaseConnectionError(
+                "Failed to clean up incomplete database initialization"
+            ) from first_error
+
+    def _assert_owner(self) -> None:
+        """Reject use outside the process and thread that created the instance."""
+        owner_process_id = getattr(self, "_owner_process_id", None)
+        if owner_process_id is None:
+            return
+        if os.getpid() != owner_process_id:
+            raise DatabaseError(
+                "Database instances may only be used in their creating process"
+            )
+
+        owner_thread = getattr(self, "_owner_thread", None)
+        allow_cross_thread = getattr(
+            self,
+            "_unsafe_allow_cross_thread",
+            False,
+        )
+        if (
+            not allow_cross_thread
+            and owner_thread is not None
+            and threading.current_thread() is not owner_thread
+        ):
+            raise DatabaseError(
+                "Database instances may only be used by their creating thread"
+            )
+
     def _init_sqlite(self, database: str = ":memory:", **kwargs):
         """Initialize SQLite connection."""
-        self.connection = sqlite3.connect(database, **kwargs)
-        self.connection.row_factory = sqlite3.Row
-        self.cursor = self.connection.cursor()
-    
+        connection = None
+        cursor = None
+        try:
+            connection = sqlite3.connect(database, **kwargs)
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+        except BaseException:
+            self._close_initialization_resources(cursor, connection)
+            raise
+        self.connection = connection
+        self.cursor = cursor
+
     def _init_postgres(self, **kwargs):
         """Initialize PostgreSQL connection."""
         if not POSTGRES_AVAILABLE:
             raise DatabaseError("psycopg2 is not installed")
-        self.connection = psycopg2.connect(**kwargs)  # type: ignore
-        self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)  # type: ignore
-        # Stability: default autocommit ON for Postgres so DDL executed outside an explicit
-        # Database.transaction() isn't accidentally rolled back by a later rollback.
-        self.connection.autocommit = True  # type: ignore[attr-defined]
-    
+        connection = None
+        cursor = None
+        try:
+            connection = psycopg2.connect(**kwargs)  # type: ignore
+            cursor = connection.cursor(  # type: ignore[union-attr]
+                cursor_factory=psycopg2.extras.DictCursor  # type: ignore
+            )
+            # Keep DDL outside an explicit transaction from being rolled back
+            # by a later rollback.
+            connection.autocommit = True  # type: ignore[union-attr]
+        except BaseException:
+            self._close_initialization_resources(cursor, connection)
+            raise
+        self.connection = connection
+        self.cursor = cursor
+
     def _init_mysql(self, **kwargs):
         """Initialize MySQL connection."""
         if not MYSQL_AVAILABLE:
             raise DatabaseError("pymysql is not installed")
-        self.connection = pymysql.connect(**kwargs)  # type: ignore
-        self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)  # type: ignore
+        connection = None
+        cursor = None
+        try:
+            connection = pymysql.connect(**kwargs)  # type: ignore
+            cursor = connection.cursor(  # type: ignore[union-attr]
+                pymysql.cursors.DictCursor  # type: ignore
+            )
+        except BaseException:
+            self._close_initialization_resources(cursor, connection)
+            raise
+        self.connection = connection
+        self.cursor = cursor
     
     def _init_mongodb(self, **kwargs):
         """Initialize MongoDB connection."""
         if not MONGODB_AVAILABLE:
             raise DatabaseError("pymongo is not installed")
-        client = pymongo.MongoClient(**kwargs)  # type: ignore
-        self.connection = client[kwargs.get("database", "test")]
+        client_options = dict(kwargs)
+        database_name = client_options.pop("database", "test")
+        client = pymongo.MongoClient(**client_options)  # type: ignore
+        try:
+            connection = client[database_name]
+        except BaseException:
+            self._close_initialization_resources(client)
+            raise
+        self.connection = connection
+        self._driver_owner = client
     
     def _init_redis(self, **kwargs):
         """Initialize Redis connection."""
@@ -817,82 +1073,259 @@ class Database:
     
     def close(self):
         """Close database connection."""
+        self._assert_owner()
         cursor = self.cursor
         self.cursor = None
-        if cursor:
-            cursor_shutdown = getattr(cursor, "close", None)
-            if callable(cursor_shutdown):
-                cursor_shutdown()
-
         connection = self.connection
         self.connection = None
-        if connection:
-            connection_shutdown = getattr(connection, "close", None)
-            if callable(connection_shutdown):
-                connection_shutdown()
+        driver_owner = self._driver_owner
+        self._driver_owner = None
+        pool = self._pool
+        self._pool = None
+        self._transaction_active = False
+        self._transaction_depth = 0
+        self._savepoint_counter = 0
+        self._savepoints = []
+        self._prev_autocommit = None
 
-        if self._pool:
-            self._pool.close_all()
-            self._pool = None
+        first_error = None
+        seen_resources = set()
+        for resource in (cursor, connection, driver_owner):
+            if resource is None or id(resource) in seen_resources:
+                continue
+            seen_resources.add(id(resource))
+            shutdown = getattr(resource, "close", None)
+            if callable(shutdown):
+                try:
+                    shutdown()
+                except Exception as exc:  # noqa: BLE001
+                    if first_error is None:
+                        first_error = exc
+
+        if pool is not None:
+            try:
+                pool.close_all()
+            except Exception as exc:  # noqa: BLE001
+                if first_error is None:
+                    first_error = exc
+
+        if first_error is not None:
+            raise DatabaseError("Failed to close one or more database resources") from first_error
     
     def __enter__(self):
-        """Context manager entry."""
+        """Enter a connection-owning root transaction."""
+        self._assert_owner()
+        try:
+            self.begin()
+        except BaseException:
+            try:
+                self.close()
+            except BaseException as close_error:
+                raise DatabaseError(
+                    "Failed to enter database context and close resources"
+                ) from close_error
+            raise
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        if exc_type:
-            self.rollback()
-        else:
-            self.commit()
-        self.close()
+        """Finish all managed levels and close every owned resource."""
+        try:
+            operation = self.rollback if exc_type else self.commit
+            if self._transaction_depth:
+                while self._transaction_depth:
+                    operation()
+            else:
+                # Retain direct ``__exit__`` compatibility for callers that
+                # entered the context before managed-depth tracking existed.
+                operation()
+        finally:
+            self.close()
     
     @contextmanager
     def transaction(self):
         """
-        Context manager for database transactions.
+        Context manager for transactions and nested savepoints.
         """
+        target_depth = self._transaction_depth
         self.begin()
         try:
             yield self
-            self.commit()
-        except Exception:
-            self.rollback()
+            while self._transaction_depth > target_depth:
+                self.commit()
+        except BaseException:
+            try:
+                while self._transaction_depth > target_depth:
+                    self.rollback()
+            except BaseException as rollback_error:
+                raise DatabaseError(
+                    "Transaction failed and rollback failed"
+                ) from rollback_error
             raise
-    
+
+    def _execute_transaction_control(self, statement: str, action: str) -> None:
+        cursor = self.cursor
+        if cursor is None:
+            raise DatabaseError(
+                "Database cursor is not available for transaction control"
+            )
+        try:
+            cursor.execute(statement)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to {action}") from exc
+
+    def _reset_transaction_state(self) -> None:
+        self._transaction_active = False
+        self._transaction_depth = 0
+        self._savepoint_counter = 0
+        self._savepoints.clear()
+        self._prev_autocommit = None
+
+    def _restore_postgres_autocommit(
+        self,
+        connection: Any,
+        previous_autocommit: bool | None,
+    ) -> None:
+        if self.engine == "postgres" and previous_autocommit is True:
+            connection.autocommit = True
+
     def begin(self):
-        """Begin a transaction."""
+        """Begin a transaction or create a nested savepoint."""
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
+            if self.connection is None:
+                raise DatabaseError("Database connection is not available for begin")
+
+            if self._transaction_depth:
+                self._savepoint_counter += 1
+                savepoint = f"unicorefw_sp_{self._savepoint_counter}"
+                self._execute_transaction_control(
+                    f"SAVEPOINT {savepoint}",
+                    "create transaction savepoint",
+                )
+                self._savepoints.append(savepoint)
+                self._transaction_depth += 1
+                self._transaction_active = True
+                return
+
+            try:
+                if self.engine == "sqlite":
+                    if not self.connection.in_transaction:  # type: ignore[union-attr]
+                        self.connection.execute("BEGIN")  # type: ignore[union-attr]
+                elif self.engine == "postgres":
+                    # Temporarily disable autocommit for the root transaction.
+                    self._prev_autocommit = getattr(
+                        self.connection,
+                        "autocommit",
+                        None,
+                    )
+                    if self._prev_autocommit is True:
+                        self.connection.autocommit = False  # type: ignore[attr-defined]
+                    self.cursor.execute("BEGIN")  # type: ignore
+                else:
+                    connection_begin = getattr(self.connection, "begin", None)
+                    if callable(connection_begin):
+                        connection_begin()
+            except BaseException as begin_error:
+                previous_autocommit = self._prev_autocommit
+                self._prev_autocommit = None
+                if self.engine == "postgres" and previous_autocommit is True:
+                    try:
+                        self.connection.autocommit = True  # type: ignore[attr-defined]
+                    except Exception as restore_error:
+                        raise DatabaseError(
+                            "Failed to begin transaction and restore autocommit"
+                        ) from restore_error
+                if isinstance(begin_error, Exception):
+                    raise DatabaseError(
+                        "Failed to begin database transaction"
+                    ) from begin_error
+                raise
+            self._transaction_depth = 1
             self._transaction_active = True
-            if self.engine == "postgres":
-                # Temporarily disable autocommit for the duration of the transaction
-                self._prev_autocommit = getattr(self.connection, "autocommit", None)  # type: ignore[attr-defined]
-                if self._prev_autocommit is True:
-                    self.connection.autocommit = False  # type: ignore[attr-defined]
-                self.cursor.execute("BEGIN")  # type: ignore
-    
+
     def commit(self):
-        """Commit the current transaction."""
+        """Commit the current transaction level."""
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            connection_commit = getattr(self.connection, "commit", None)
+            connection = self.connection
+            connection_commit = getattr(connection, "commit", None)
             if not callable(connection_commit):
                 raise DatabaseError("Database connection is not available for commit")
-            connection_commit()
-            self._transaction_active = False
-            if self.engine == "postgres" and self._prev_autocommit is True:
-                self.connection.autocommit = True  # type: ignore[attr-defined]
-            self._prev_autocommit = None
-    
+
+            if self._transaction_depth > 1:
+                savepoint = self._savepoints[-1]
+                self._execute_transaction_control(
+                    f"RELEASE SAVEPOINT {savepoint}",
+                    "release transaction savepoint",
+                )
+                self._savepoints.pop()
+                self._transaction_depth -= 1
+                self._transaction_active = True
+                return
+
+            previous_autocommit = self._prev_autocommit
+            try:
+                connection_commit()
+            except Exception as exc:
+                raise DatabaseError(
+                    "Failed to commit database transaction"
+                ) from exc
+            self._reset_transaction_state()
+            try:
+                self._restore_postgres_autocommit(
+                    connection,
+                    previous_autocommit,
+                )
+            except Exception as exc:
+                raise DatabaseError(
+                    "Failed to restore database transaction mode"
+                ) from exc
+
     def rollback(self):
-        """Rollback the current transaction."""
+        """Roll back the current transaction level."""
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
-            self.connection.rollback()  # type: ignore
-            self._transaction_active = False
-            if self.engine == "postgres" and self._prev_autocommit is True:
-                self.connection.autocommit = True  # type: ignore[attr-defined]
-            self._prev_autocommit = None
-    
-    def execute(self, query: str, params: Optional[Tuple] = None) -> Any:
+            connection = self.connection
+            connection_rollback = getattr(connection, "rollback", None)
+            if not callable(connection_rollback):
+                raise DatabaseError(
+                    "Database connection is not available for rollback"
+                )
+
+            if self._transaction_depth > 1:
+                savepoint = self._savepoints[-1]
+                self._execute_transaction_control(
+                    f"ROLLBACK TO SAVEPOINT {savepoint}",
+                    "roll back transaction savepoint",
+                )
+                self._execute_transaction_control(
+                    f"RELEASE SAVEPOINT {savepoint}",
+                    "release transaction savepoint",
+                )
+                self._savepoints.pop()
+                self._transaction_depth -= 1
+                self._transaction_active = True
+                return
+
+            previous_autocommit = self._prev_autocommit
+            try:
+                connection_rollback()
+            except Exception as exc:
+                raise DatabaseError(
+                    "Failed to roll back database transaction"
+                ) from exc
+            self._reset_transaction_state()
+            try:
+                self._restore_postgres_autocommit(
+                    connection,
+                    previous_autocommit,
+                )
+            except Exception as exc:
+                raise DatabaseError(
+                    "Failed to restore database transaction mode"
+                ) from exc
+
+    def execute(self, query: str, params: tuple | None = None) -> Any:
         """
         Execute a SQL query.
         
@@ -903,19 +1336,25 @@ class Database:
         Returns:
             Query result
         """
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
+            if not isinstance(query, str) or not query.strip() or "\x00" in query:
+                raise QueryError("Query must be non-empty text without null bytes")
+            cursor = self.cursor
+            if cursor is None:
+                raise QueryError("Database cursor is not available for query execution")
             try:
                 if params:
-                    self.cursor.execute(query, params)  # type: ignore
+                    cursor.execute(query, params)
                 else:
-                    self.cursor.execute(query)  # type: ignore
-                return self.cursor
-            except Exception as e:
-                raise QueryError(f"Query execution failed: {e}")
+                    cursor.execute(query)
+                return cursor
+            except Exception as exc:
+                raise QueryError("Query execution failed") from exc
         else:
             raise DatabaseError(f"Execute not supported for {self.engine}")
     
-    def fetch_all(self, query: str, params: Optional[Tuple] = None) -> List[Dict]:
+    def fetch_all(self, query: str, params: tuple | None = None) -> list[dict]:
         """
         Execute query and fetch all results.
         
@@ -924,7 +1363,7 @@ class Database:
             params: Query parameters
             
         Returns:
-            List of result dictionaries
+            list of result dictionaries
         """
         self.execute(query, params)
         if self.engine == "sqlite":
@@ -932,7 +1371,7 @@ class Database:
         else:
             return self.cursor.fetchall()  # type: ignore
     
-    def fetch_one(self, query: str, params: Optional[Tuple] = None) -> Optional[Dict]:
+    def fetch_one(self, query: str, params: tuple | None = None) -> dict | None:
         """
         Execute query and fetch one result.
         
@@ -949,17 +1388,18 @@ class Database:
             return dict(result)
         return result
     
-    def insert(self, table: str, data: Dict[str, Any]) -> int:
+    def insert(self, table: str, data: dict[str, Any]) -> int:
         """
         Insert a record into a table.
         
         Args:
             table: Table name
-            data: Dictionary of column-value pairs
+            data: dictionary of column-value pairs
             
         Returns:
             Last inserted row ID
         """
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
             if not isinstance(data, dict) or not data:
                 raise DatabaseError("Insert data must be a non-empty dict")
@@ -974,20 +1414,20 @@ class Database:
 
             # Postgres: if user provides id explicitly, do not call LASTVAL() (it can be undefined).
             if self.engine == "postgres" and "id" in data:
-                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are allowlisted and quoted while values remain bound.
                 query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"  # nosec B608
                 self.execute(query, tuple(data[k] for k in keys))
                 try:
                     return int(data["id"])  # type: ignore[arg-type]
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return 0
 
             if self.engine == "postgres":
                 # Best-effort for common PK name "id" on Postgres.
-                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are allowlisted and quoted while values remain bound.
                 query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders}) RETURNING id"  # nosec B608
             else:
-                # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are allowlisted and quoted while values remain bound.
                 query = f"INSERT INTO {qtable} ({qcols}) VALUES ({placeholders})"  # nosec B608
 
             self.execute(query, tuple(data[k] for k in keys))
@@ -1005,18 +1445,19 @@ class Database:
         else:
             raise DatabaseError(f"Insert not supported for {self.engine}")
     
-    def update(self, table: str, data: Dict[str, Any], where: Dict[str, Any]) -> int:
+    def update(self, table: str, data: dict[str, Any], where: dict[str, Any]) -> int:
         """
         Update records in a table.
         
         Args:
             table: Table name
-            data: Dictionary of column-value pairs to update
-            where: Dictionary of conditions
+            data: dictionary of column-value pairs to update
+            where: dictionary of conditions
             
         Returns:
             Number of affected rows
         """
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
             # Security-first: refuse mass update via helper API
             if not where:
@@ -1024,17 +1465,17 @@ class Database:
             if not data:
                 return 0
 
-            for k in data.keys():
+            for k in data:
                 _validate_ident(k)
-            for k in where.keys():
+            for k in where:
                 _validate_ident(k)
 
             qtable = _qtable(self.engine, table)
             set_clause = ", ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
-                                   for k in data.keys()])
+                                   for k in data])
             where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
-                                        for k in where.keys()])
-            # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                                        for k in where])
+            # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are allowlisted and quoted while values remain bound.
             query = f"UPDATE {qtable} SET {set_clause} WHERE {where_clause}"  # nosec B608
             
             params = tuple(list(data.values()) + list(where.values()))
@@ -1046,28 +1487,29 @@ class Database:
         else:
             raise DatabaseError(f"Update not supported for {self.engine}")
     
-    def delete(self, table: str, where: Dict[str, Any]) -> int:
+    def delete(self, table: str, where: dict[str, Any]) -> int:
         """
         Delete records from a table.
         
         Args:
             table: Table name
-            where: Dictionary of conditions
+            where: dictionary of conditions
             
         Returns:
             Number of deleted rows
         """
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
             # Security-first: refuse mass delete via helper API
             if not where:
                 raise DatabaseError("Refusing to DELETE without a WHERE clause (security-first).")
-            for k in where.keys():
+            for k in where:
                 _validate_ident(k)
 
             qtable = _qtable(self.engine, table)
             where_clause = " AND ".join([f"{_qident(self.engine, k)} = ?" if self.engine == "sqlite" else f"{_qident(self.engine, k)} = %s" 
-                                        for k in where.keys()])
-            # Bandit B608 review: identifiers are allowlisted and quoted; values stay bound.
+                                        for k in where])
+            # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are allowlisted and quoted while values remain bound.
             query = f"DELETE FROM {qtable} WHERE {where_clause}"  # nosec B608
             
             self.execute(query, tuple(where.values()))
@@ -1078,14 +1520,15 @@ class Database:
         else:
             raise DatabaseError(f"Delete not supported for {self.engine}")
     
-    def create_table(self, table: str, schema: Dict[str, str]):
+    def create_table(self, table: str, schema: dict[str, str]):
         """
         Create a table with the given schema.
         
         Args:
             table: Table name
-            schema: Dictionary of column names to types
+            schema: dictionary of column names to types
         """
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
             columns = []
             for name, dtype in schema.items():
@@ -1094,7 +1537,8 @@ class Database:
 
             query = f"CREATE TABLE IF NOT EXISTS {_qtable(self.engine, table)} ({', '.join(columns)})"
             self.execute(query)
-            self.commit()
+            if not self._transaction_active:
+                self.commit()
         elif self.engine == "mongodb":
             # MongoDB creates collections automatically
             pass
@@ -1103,10 +1547,12 @@ class Database:
     
     def drop_table(self, table: str):
         """Drop a table."""
+        self._assert_owner()
         if self.engine in ["sqlite", "postgres", "mysql"]:
             query = f"DROP TABLE IF EXISTS {_qtable(self.engine, table)}"
             self.execute(query)
-            self.commit()
+            if not self._transaction_active:
+                self.commit()
         elif self.engine == "mongodb":
             self.connection[table].drop()  # type: ignore
         else:
@@ -1123,13 +1569,13 @@ class QueryBuilder:
     its call site.
     """
 
-    _SUPPORTED_ENGINES = {"sqlite", "postgres", "mysql"}
+    _SUPPORTED_ENGINES = {"sqlite", "postgres", "mysql"}  # noqa: RUF012
 
     def __init__(
         self,
-        db: Optional[Database] = None,
+        db: Database | None = None,
         *,
-        engine: Optional[str] = None,
+        engine: str | None = None,
         max_limit: int = 1_000_000,
         max_offset: int = 1_000_000,
     ):
@@ -1156,18 +1602,18 @@ class QueryBuilder:
         self.max_limit = _validate_positive_int(max_limit, "max_limit")
         self.max_offset = _validate_positive_int(max_offset, "max_offset")
 
-        self._select_fields: List[str] = []
-        self._from_source: Optional[str] = None
-        self._from_params: Tuple[Any, ...] = ()
-        self._joins: List[str] = []
-        self._where_conditions: List[Tuple[str, Tuple[Any, ...]]] = []
-        self._group_by_fields: List[str] = []
-        self._having_conditions: List[Tuple[str, Tuple[Any, ...]]] = []
-        self._order_by_fields: List[str] = []
-        self._limit_value: Optional[int] = None
-        self._offset_value: Optional[int] = None
+        self._select_fields: list[str] = []
+        self._from_source: str | None = None
+        self._from_params: tuple[Any, ...] = ()
+        self._joins: list[str] = []
+        self._where_conditions: list[tuple[str, tuple[Any, ...]]] = []
+        self._group_by_fields: list[str] = []
+        self._having_conditions: list[tuple[str, tuple[Any, ...]]] = []
+        self._order_by_fields: list[str] = []
+        self._limit_value: int | None = None
+        self._offset_value: int | None = None
 
-    def select(self, *fields: Union[str, UnsafeSQL]) -> "QueryBuilder":
+    def select(self, *fields: str | UnsafeSQL) -> "QueryBuilder":
         """Add validated SELECT fields or explicit trusted expressions."""
         if not fields:
             raise DatabaseError("select() requires at least one field")
@@ -1200,7 +1646,7 @@ class QueryBuilder:
     def join(
         self,
         table: str,
-        on: Union[str, UnsafeSQL],
+        on: str | UnsafeSQL,
         join_type: str = "INNER",
     ) -> "QueryBuilder":
         """Add a validated JOIN and field-to-field ON predicate."""
@@ -1217,7 +1663,7 @@ class QueryBuilder:
 
     def where(
         self,
-        condition: Union[str, UnsafeSQL],
+        condition: str | UnsafeSQL,
         *params: Any,
     ) -> "QueryBuilder":
         """Add a simple validated WHERE predicate and its bound value."""
@@ -1226,7 +1672,7 @@ class QueryBuilder:
         )
         return self
 
-    def group_by(self, *fields: Union[str, UnsafeSQL]) -> "QueryBuilder":
+    def group_by(self, *fields: str | UnsafeSQL) -> "QueryBuilder":
         """Add validated GROUP BY fields."""
         if not fields:
             raise DatabaseError("group_by() requires at least one field")
@@ -1237,7 +1683,7 @@ class QueryBuilder:
 
     def having(
         self,
-        condition: Union[str, UnsafeSQL],
+        condition: str | UnsafeSQL,
         *params: Any,
     ) -> "QueryBuilder":
         """Add a simple validated HAVING predicate and its bound value."""
@@ -1248,7 +1694,7 @@ class QueryBuilder:
 
     def order_by(
         self,
-        field: Union[str, UnsafeSQL],
+        field: str | UnsafeSQL,
         direction: str = "ASC",
     ) -> "QueryBuilder":
         """Add a validated ORDER BY field and direction."""
@@ -1287,15 +1733,15 @@ class QueryBuilder:
         self._offset_value = value
         return self
 
-    def build(self) -> Tuple[str, Tuple]:
+    def build(self) -> tuple[str, tuple]:
         """
         Build the SQL query.
 
         Returns:
-            Tuple of (query_string, parameters)
+            tuple of (query_string, parameters)
         """
-        parts: List[str] = []
-        params: List[Any] = []
+        parts: list[str] = []
+        params: list[Any] = []
 
         if self._select_fields:
             parts.append(f"SELECT {', '.join(self._select_fields)}")
@@ -1336,7 +1782,7 @@ class QueryBuilder:
 
         return " ".join(parts), tuple(params)
 
-    def execute(self) -> List[Dict]:
+    def execute(self) -> list[dict]:
         """Execute the built query."""
         if not self.db:
             raise DatabaseError("No database connection provided")
@@ -1386,8 +1832,43 @@ class Migration:
             raise DatabaseError(f"Migrations not supported for {self.db.engine}")
 
         self.db.create_table("_migrations", schema)
+
+    @staticmethod
+    def _validate_version(version: str) -> str:
+        if (
+            not isinstance(version, str)
+            or not version.strip()
+            or "\x00" in version
+        ):
+            raise DatabaseError(
+                "Migration version must be a non-empty text value"
+            )
+        if len(version) > 255:
+            raise DatabaseError("Migration version must not exceed 255 characters")
+        return version
+
+    @staticmethod
+    def _validate_script(script: str, name: str) -> str:
+        if not isinstance(script, str) or not script.strip() or "\x00" in script:
+            raise DatabaseError(
+                f"Migration {name} SQL must be a non-empty text value"
+            )
+        return script
+
+    def _execute_script(self, script: str) -> None:
+        if self.db.engine == "sqlite":
+            for statement in _sqlite_script_statements(script):
+                self.db.execute(statement)
+            return
+        if self.db.engine == "mysql":
+            for statement in _mysql_script_statements(script):
+                self.db.execute(statement)
+            return
+        # Let the active DB-API driver handle its native script grammar. A
+        # generic semicolon split corrupts quoted strings and procedural SQL.
+        self.db.execute(script)
     
-    def apply(self, version: str, up_sql: str, down_sql: Optional[str] = None):
+    def apply(self, version: str, up_sql: str, down_sql: str | None = None):
         """
         Apply a migration.
         
@@ -1396,30 +1877,34 @@ class Migration:
             up_sql: SQL to apply the migration
             down_sql: Optional SQL to rollback the migration
         """
+        version = self._validate_version(version)
+        up_sql = self._validate_script(up_sql, "up")
+        checksum = hashlib.sha256(up_sql.encode("utf-8")).hexdigest()
+
         # Check if already applied
         placeholder = "?" if self.db.engine == "sqlite" else "%s"
         migration_table = _qtable(self.db.engine, "_migrations")
         version_column = _qident(self.db.engine, "version")
-        # Bandit B608 review: both identifiers are fixed constants; version stays bound.
+        # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are fixed constants and the migration version remains bound.
         query = f"SELECT * FROM {migration_table} WHERE {version_column} = {placeholder}"  # nosec B608
         existing = self.db.fetch_one(query, (version,))
-        
+
         if existing:
+            existing_checksum = existing.get("checksum")
+            if existing_checksum and existing_checksum != checksum:
+                raise DatabaseError(
+                    "Migration checksum does not match the applied version"
+                )
             return False
-        
-        # Calculate checksum
-        checksum = hashlib.sha256(up_sql.encode()).hexdigest()
-        
+
         # Apply migration
         with self.db.transaction():
-            for statement in up_sql.split(';'):
-                if statement.strip():
-                    self.db.execute(statement)
-            
+            self._execute_script(up_sql)
+
             # Record migration
             self.db.insert("_migrations", {
                 "version": version,
-                "applied_at": datetime.now().isoformat(),
+                "applied_at": datetime.now().isoformat(),  # noqa: DTZ005
                 "checksum": checksum
             })
         
@@ -1433,14 +1918,14 @@ class Migration:
             version: Migration version to rollback
             down_sql: SQL to rollback the migration
         """
+        version = self._validate_version(version)
+        down_sql = self._validate_script(down_sql, "down")
+
         with self.db.transaction():
-            for statement in down_sql.split(';'):
-                if statement.strip():
-                    self.db.execute(statement)
-            
+            self._execute_script(down_sql)
             self.db.delete("_migrations", {"version": version})
     
-    def status(self) -> List[Dict]:
+    def status(self) -> list[dict]:
         """Get migration status."""
         return self.db.fetch_all("SELECT * FROM _migrations ORDER BY applied_at")
 
@@ -1461,9 +1946,9 @@ class DataExporter:
 
     def _fetch_source(
         self,
-        table_or_query: Union[str, UnsafeSQL],
-        params: Optional[Tuple] = None,
-    ) -> List[Dict]:
+        table_or_query: str | UnsafeSQL,
+        params: tuple | None = None,
+    ) -> list[dict]:
         """Fetch a validated table or an explicitly trusted SQL query."""
         if self.db.engine not in {"sqlite", "postgres", "mysql"}:
             raise ExportError(
@@ -1478,14 +1963,14 @@ class DataExporter:
             raise ExportError(
                 "Bound parameters require an explicit unsafe_raw_sql() query"
             )
-        # Bandit B608 review: qtable is allowlisted and quoted by _qtable().
+        # Security suppression: codes=B608; expires=2027-07-28; rationale=The table identifier is allowlisted and dialect-quoted before interpolation.
         return self.db.fetch_all(f"SELECT * FROM {qtable}")  # nosec B608
 
     def to_json(
         self,
-        table_or_query: Union[str, UnsafeSQL],
+        table_or_query: str | UnsafeSQL,
         file_path: str,
-        params: Optional[Tuple] = None,
+        params: tuple | None = None,
         indent: int = 2,
     ):
         """
@@ -1509,9 +1994,9 @@ class DataExporter:
 
     def to_csv(
         self,
-        table_or_query: Union[str, UnsafeSQL],
+        table_or_query: str | UnsafeSQL,
         file_path: str,
-        params: Optional[Tuple] = None,
+        params: tuple | None = None,
         delimiter: str = ',',
         spreadsheet_safe: bool = True,
     ):
@@ -1555,13 +2040,9 @@ class DataExporter:
 
     def to_excel(
         self,
-        tables_or_queries: Union[
-            str,
-            UnsafeSQL,
-            Dict[str, Union[str, UnsafeSQL]],
-        ],
+        tables_or_queries: str | UnsafeSQL | dict[str, str | UnsafeSQL],
         file_path: str,
-        params: Optional[Dict[str, Tuple]] = None,
+        params: dict[str, tuple] | None = None,
         spreadsheet_safe: bool = True,
     ):
         """
@@ -1632,6 +2113,7 @@ class DataExporter:
             ExportError: If the database is not SQLite or export fails.
         """
         try:
+            self.db._assert_owner()
             if self.db.engine != "sqlite" or not isinstance(
                 self.db.connection, sqlite3.Connection
             ):
@@ -1649,7 +2131,7 @@ class DataExporter:
                 if not schema or not schema["sql"]:
                     raise ExportError(f"SQLite table does not exist: {table!r}")
 
-                # Bandit B608 review: qtable is allowlisted and quoted by _qtable().
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=The table identifier is allowlisted and SQLite-quoted before interpolation.
                 metadata_cursor = snapshot.execute(
                     f"SELECT * FROM {qtable} LIMIT 0"  # nosec B608
                 )
@@ -1668,7 +2150,7 @@ class DataExporter:
                     f"CAST(quote({_qident('sqlite', name)}) AS TEXT)"
                     for name in column_names
                 )
-                # Bandit B608 review: table and column identifiers are allowlisted and quoted.
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=Table and column identifiers are allowlisted and quoted before interpolation.
                 rows = snapshot.execute(
                     f"SELECT {quoted_values} FROM {qtable}"  # nosec B608
                 )
@@ -1681,7 +2163,7 @@ class DataExporter:
                         literals = ", ".join(
                             value if value is not None else "NULL" for value in row
                         )
-                        # Bandit B608 review: identifiers are quoted and SQLite quote() encoded each literal.
+                        # Security suppression: codes=B608; expires=2027-07-28; rationale=Identifiers are quoted and SQLite quote encodes every exported literal.
                         stream.write(
                             f"INSERT INTO {qtable} ({quoted_columns}) "  # nosec B608
                             f"VALUES ({literals});\n"
@@ -1693,10 +2175,10 @@ class DataExporter:
 
     def to_html(
         self,
-        table_or_query: Union[str, UnsafeSQL],
+        table_or_query: str | UnsafeSQL,
         file_path: str,
-        params: Optional[Tuple] = None,
-        css_style: Optional[UnsafeCSS] = None,
+        params: tuple | None = None,
+        css_style: UnsafeCSS | None = None,
     ):
         """
         Export data to HTML table.
@@ -1732,7 +2214,7 @@ class DataExporter:
             if data:
                 # Headers
                 html_parts.append('<thead><tr>')
-                for key in data[0].keys():
+                for key in data[0]:
                     html_parts.append(
                         f'<th>{html_lib.escape(str(key), quote=True)}</th>'
                     )
@@ -1798,6 +2280,7 @@ class DataImporter:
             max_columns: Maximum keys in one record
         """
         try:
+            validated_path = _text_file_path(file_path)
             byte_limit = _validate_resource_limit(
                 max_bytes,
                 "max_bytes",
@@ -1818,9 +2301,9 @@ class DataImporter:
                 "batch_size",
                 _HARD_MAX_IMPORT_BATCH_SIZE,
             )
-            _validate_file_size(file_path, byte_limit, "JSON import bytes")
+            _validate_file_size(validated_path, byte_limit, "JSON import bytes")
             with _bounded_text_reader(
-                file_path,
+                validated_path,
                 byte_limit,
                 "JSON import bytes",
             ) as f:
@@ -1839,14 +2322,13 @@ class DataImporter:
                 format_name="JSON",
             )
 
-            # Create table if needed
-            if create_table:
-                schema = self._infer_schema(data[0])
-                self.db.create_table(table, schema)
+            schema = self._infer_schema(data[0]) if create_table else None
 
             # Insert data in batches
             total_inserted = 0
             with self.db.transaction():
+                if schema is not None:
+                    self.db.create_table(table, schema)
                 for i in range(0, len(data), validated_batch_size):
                     batch = data[i : i + validated_batch_size]
                     for record in batch:
@@ -1854,10 +2336,8 @@ class DataImporter:
                         total_inserted += 1
 
             return total_inserted
-        except Exception as e:
-            if isinstance(e, (InputValidationError, ResourceLimitError)):
-                raise
-            raise ImportError(f"Failed to import from JSON: {e}")
+        except Exception as e:  # noqa: BLE001
+            _raise_import_failure("JSON", e)
 
     def from_csv(
         self,
@@ -1887,6 +2367,7 @@ class DataImporter:
             max_columns: Maximum fields in one row
         """
         try:
+            validated_path = _text_file_path(file_path)
             byte_limit = _validate_resource_limit(
                 max_bytes,
                 "max_bytes",
@@ -1907,11 +2388,11 @@ class DataImporter:
                 "batch_size",
                 _HARD_MAX_IMPORT_BATCH_SIZE,
             )
-            _validate_file_size(file_path, byte_limit, "CSV import bytes")
+            _validate_file_size(validated_path, byte_limit, "CSV import bytes")
             total_inserted = 0
 
             with _bounded_text_reader(
-                file_path,
+                validated_path,
                 byte_limit,
                 "CSV import bytes",
                 newline="",
@@ -1926,12 +2407,12 @@ class DataImporter:
                 if not first_row:
                     return 0
                 first_row_columns = (
-                    len(reader.fieldnames or [])
+                    len(reader.fieldnames or []) # type: ignore
                     if has_header
                     else len(first_row)
                 )
                 if has_header and None in first_row:
-                    first_row_columns += len(first_row[None] or [])
+                    first_row_columns += len(first_row[None] or []) # type: ignore
                 if first_row_columns > column_limit:
                     raise ResourceLimitError(
                         "CSV import columns",
@@ -1939,7 +2420,7 @@ class DataImporter:
                         first_row_columns,
                     )
 
-                # Create table if needed
+                schema = None
                 if create_table:
                     if has_header:
                         schema = self._infer_schema(first_row)  # type: ignore
@@ -1948,10 +2429,11 @@ class DataImporter:
                             f"column_{i}": "TEXT"
                             for i in range(len(first_row))
                         }
-                    self.db.create_table(table, schema)
 
                 # Insert data
                 with self.db.transaction():
+                    if schema is not None:
+                        self.db.create_table(table, schema)
                     # Insert first row
                     if has_header:
                         self.db.insert(table, first_row)  # type: ignore
@@ -1976,12 +2458,12 @@ class DataImporter:
                                 observed_rows,
                             )
                         observed_columns = (
-                            len(reader.fieldnames or [])
+                            len(reader.fieldnames or []) # type: ignore
                             if has_header
                             else len(row)
                         )
                         if has_header and None in row:
-                            observed_columns += len(row[None] or [])
+                            observed_columns += len(row[None] or []) # type: ignore
                         if observed_columns > column_limit:
                             raise ResourceLimitError(
                                 "CSV import columns",
@@ -2010,16 +2492,14 @@ class DataImporter:
                         total_inserted += 1
 
             return total_inserted
-        except Exception as e:
-            if isinstance(e, (InputValidationError, ResourceLimitError)):
-                raise
-            raise ImportError(f"Failed to import from CSV: {e}")
+        except Exception as e:  # noqa: BLE001
+            _raise_import_failure("CSV", e)
 
     def from_excel(
         self,
         file_path: str,
-        table: Optional[str] = None,
-        sheet_name: Optional[Union[str, int]] = 0,
+        table: str | None = None,
+        sheet_name: str | int | None = 0,
         create_table: bool = True,
         *,
         max_bytes: int = _DEFAULT_MAX_IMPORT_BYTES,
@@ -2048,6 +2528,7 @@ class DataImporter:
             raise ImportError("pandas is required for Excel import")
 
         try:
+            validated_path = _text_file_path(file_path)
             byte_limit = _validate_resource_limit(
                 max_bytes,
                 "max_bytes",
@@ -2063,9 +2544,9 @@ class DataImporter:
                 "max_columns",
                 _HARD_MAX_IMPORT_COLUMNS,
             )
-            _validate_file_size(file_path, byte_limit, "Excel import bytes")
+            _validate_file_size(validated_path, byte_limit, "Excel import bytes")
             workbook_bytes = _read_bounded_bytes(
-                file_path,
+                validated_path,
                 byte_limit,
                 "Excel import bytes",
             )
@@ -2111,14 +2592,13 @@ class DataImporter:
                 format_name="Excel",
             )
 
-            # Create table if needed
-            if create_table:
-                schema = self._infer_schema(records[0])
-                self.db.create_table(table, schema)
+            schema = self._infer_schema(records[0]) if create_table else None
 
             # Insert data
             total_inserted = 0
             with self.db.transaction():
+                if schema is not None:
+                    self.db.create_table(table, schema)  # type: ignore[arg-type]
                 for record in records:
                     # Convert NaN to None
                     clean_record = {
@@ -2129,10 +2609,8 @@ class DataImporter:
                     total_inserted += 1
 
             return total_inserted
-        except Exception as e:
-            if isinstance(e, (InputValidationError, ResourceLimitError)):
-                raise
-            raise ImportError(f"Failed to import from Excel: {e}")
+        except Exception as e:  # noqa: BLE001
+            _raise_import_failure("Excel", e)
 
     def from_sql(
         self,
@@ -2155,6 +2633,8 @@ class DataImporter:
             Number of rows changed by the script
         """
         try:
+            self.db._assert_owner()
+            validated_path = _text_file_path(file_path)
             limit = _validate_resource_limit(
                 max_bytes,
                 "max_bytes",
@@ -2168,36 +2648,29 @@ class DataImporter:
                     "driver-native migration tool for other engines"
                 )
 
-            with open(file_path, "rb") as stream:
-                encoded_content = stream.read(limit + 1)
-            if len(encoded_content) > limit:
-                raise ResourceLimitError(
-                    "SQL import bytes",
-                    limit,
-                    len(encoded_content),
-                )
+            encoded_content = _read_bounded_bytes(
+                validated_path,
+                limit,
+                "SQL import bytes",
+            )
             try:
                 sql_content = encoded_content.decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise ImportError("SQL script must use UTF-8 encoding") from exc
 
-            before_changes = self.db.connection.total_changes
-            try:
-                self.db.connection.executescript(sql_content)
-            except Exception:
-                self.db.connection.rollback()
-                raise
-            return self.db.connection.total_changes - before_changes
-        except Exception as e:
-            if isinstance(e, (InputValidationError, ResourceLimitError)):
-                raise
-            if isinstance(e, ImportError):
-                raise
-            raise ImportError(f"Failed to import from SQL: {e}") from e
+            with _sqlite_snapshot(self.db.connection) as staging:
+                staging.set_authorizer(_sqlite_restore_authorizer)
+                before_changes = staging.total_changes
+                staging.executescript(sql_content)
+                changed_rows = staging.total_changes - before_changes
+                staging.backup(self.db.connection)
+            return changed_rows
+        except Exception as e:  # noqa: BLE001
+            _raise_import_failure("SQL", e)
 
     def from_dict(
         self,
-        data: Union[Dict, List[Dict]],
+        data: dict | list[dict],
         table: str,
         create_table: bool = True,
         *,
@@ -2208,7 +2681,7 @@ class DataImporter:
         Import data from Python dictionary or list of dictionaries.
         
         Args:
-            data: Dictionary or list of dictionaries
+            data: dictionary or list of dictionaries
             table: Target table name
             create_table: Auto-create table if it doesn't exist
             max_rows: Maximum records
@@ -2229,7 +2702,7 @@ class DataImporter:
                 data = [data]
 
             if not isinstance(data, list):
-                raise ImportError("Dictionary import data must be a dict or list")
+                raise ImportError("dictionary import data must be a dict or list")
             if not data:
                 return 0
             _validate_import_records(
@@ -2239,27 +2712,22 @@ class DataImporter:
                 format_name="dictionary",
             )
 
-            # Create table if needed
-            if create_table:
-                schema = self._infer_schema(data[0])
-                self.db.create_table(table, schema)
+            schema = self._infer_schema(data[0]) if create_table else None
 
             # Insert data
             total_inserted = 0
             with self.db.transaction():
+                if schema is not None:
+                    self.db.create_table(table, schema)
                 for record in data:
                     self.db.insert(table, record)
                     total_inserted += 1
 
             return total_inserted
-        except Exception as e:
-            if isinstance(e, (InputValidationError, ResourceLimitError)):
-                raise
-            if isinstance(e, ImportError):
-                raise
-            raise ImportError(f"Failed to import from dictionary: {e}")
+        except Exception as e:  # noqa: BLE001
+            _raise_import_failure("dictionary", e)
     
-    def _infer_schema(self, sample: Dict) -> Dict[str, str]:
+    def _infer_schema(self, sample: dict) -> dict[str, str]:
         """
         Infer table schema from sample data.
         
@@ -2267,7 +2735,7 @@ class DataImporter:
             sample: Sample record
             
         Returns:
-            Dictionary of column names to SQL types
+            dictionary of column names to SQL types
         """
         schema = {}
         
@@ -2309,6 +2777,7 @@ class BackupRestore:
         self.importer = DataImporter(db)
 
     def _require_sqlite(self, operation: str) -> sqlite3.Connection:
+        self.db._assert_owner()
         if self.db.engine != "sqlite" or not isinstance(
             self.db.connection, sqlite3.Connection
         ):
@@ -2329,7 +2798,7 @@ class BackupRestore:
             )
         return normalized
 
-    def _sqlite_user_tables(self) -> List[str]:
+    def _sqlite_user_tables(self) -> list[str]:
         return [
             row["name"]
             for row in self.db.fetch_all(
@@ -2340,24 +2809,23 @@ class BackupRestore:
 
     def _write_sql_backup(self, backup_path: str, include_schema: bool) -> None:
         connection = self._require_sqlite("Backup")
-        with _sqlite_snapshot(connection) as snapshot:
-            with _atomic_text_writer(backup_path) as stream:
-                if include_schema:
-                    for statement in snapshot.iterdump():
-                        stream.write(statement)
-                        stream.write("\n")
-                    return
-
-                stream.write("BEGIN TRANSACTION;\n")
+        with _sqlite_snapshot(connection) as snapshot, _atomic_text_writer(backup_path) as stream:
+            if include_schema:
                 for statement in snapshot.iterdump():
-                    if statement.startswith("INSERT INTO"):
-                        stream.write(statement)
-                        stream.write("\n")
-                stream.write("COMMIT;\n")
+                    stream.write(statement)
+                    stream.write("\n")
+                return
+
+            stream.write("BEGIN TRANSACTION;\n")
+            for statement in snapshot.iterdump():
+                if statement.startswith("INSERT INTO"):
+                    stream.write(statement)
+                    stream.write("\n")
+            stream.write("COMMIT;\n")
 
     def _write_json_backup(self, backup_path: str) -> None:
         connection = self._require_sqlite("Backup")
-        table_payload: Dict[str, Any] = {}
+        table_payload: dict[str, Any] = {}
         with _sqlite_snapshot(connection) as snapshot:
             tables = [
                 row["name"]
@@ -2373,7 +2841,7 @@ class BackupRestore:
                     "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                     (table,),
                 ).fetchone()
-                # Bandit B608 review: _qtable() validated and quoted the metadata name.
+                # Security suppression: codes=B608; expires=2027-07-28; rationale=The metadata table name is validated and quoted before interpolation.
                 rows = snapshot.execute(f"SELECT * FROM {qtable}")  # nosec B608
                 table_payload[table] = {
                     "schema": schema["sql"] if schema else None,
@@ -2483,7 +2951,7 @@ class BackupRestore:
             raise
 
     @staticmethod
-    def _decode_json_tables(payload: Any) -> Dict[str, Any]:
+    def _decode_json_tables(payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise DatabaseError("JSON backup root must be an object")
 
@@ -2655,8 +3123,8 @@ class BackupRestore:
         if not os.path.isfile(requested_path):
             raise DatabaseError(f"Backup file does not exist: {requested_path!r}")
 
-        temp_path: Optional[str] = None
-        staging: Optional[sqlite3.Connection] = None
+        temp_path: str | None = None
+        staging: sqlite3.Connection | None = None
         try:
             restore_path = requested_path
             if requested_path.endswith(".gz"):
@@ -2726,7 +3194,7 @@ class CacheManager:
         self._total_weight = 0
         self._lock = threading.RLock()
 
-    def _cache_key(self, query: str, params: Optional[Tuple] = None) -> str:
+    def _cache_key(self, query: str, params: tuple | None = None) -> str:
         """Generate a length-framed SHA-256 key from query text and parameters."""
         if not isinstance(query, str):
             raise InputValidationError("query must be text")
@@ -2748,7 +3216,7 @@ class CacheManager:
             if expires_at <= current_time:
                 self._remove(key)
 
-    def get(self, query: str, params: Optional[Tuple] = None) -> Optional[List[Dict]]:
+    def get(self, query: str, params: tuple | None = None) -> list[dict] | None:
         """Return an isolated cached result or ``None`` after expiry."""
         key = self._cache_key(query, params)
         with self._lock:
@@ -2762,21 +3230,21 @@ class CacheManager:
             self.cache.move_to_end(key)
             try:
                 return copy.deepcopy(result)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self._remove(key)
                 return None
 
     def set(
         self,
         query: str,
-        result: List[Dict],
-        params: Optional[Tuple] = None,
+        result: list[dict],
+        params: tuple | None = None,
     ) -> None:
         """Cache an isolated result when it fits the configured weight budget."""
         key = self._cache_key(query, params)
         try:
             isolated_result = copy.deepcopy(result)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return
         weight = _estimate_resource_weight(
             (key, isolated_result),
@@ -2804,7 +3272,7 @@ class CacheManager:
             _ordered_dict_clear(self.cache)
             self._total_weight = 0
 
-    def cache_info(self) -> Dict[str, Union[int, float]]:
+    def cache_info(self) -> dict[str, int | float]:
         """Return current cache use and configured limits."""
         with self._lock:
             self._prune_expired(self._clock())
@@ -2819,8 +3287,8 @@ class CacheManager:
     def fetch_with_cache(
         self,
         query: str,
-        params: Optional[Tuple] = None,
-    ) -> List[Dict]:
+        params: tuple | None = None,
+    ) -> list[dict]:
         """Fetch a query and retain an isolated copy under the cache budgets."""
         result = self.get(query, params)
         if result is not None:
@@ -2846,8 +3314,8 @@ def connect(engine: str = "sqlite", **kwargs) -> Database:
     return Database(engine, **kwargs)
 
 
-def quick_query(query: str, params: Optional[Tuple] = None,
-                engine: str = "sqlite", **kwargs) -> List[Dict]:
+def quick_query(query: str, params: tuple | None = None,
+                engine: str = "sqlite", **kwargs) -> list[dict]:
     """
     Execute a quick query without maintaining connection.
     
@@ -2864,14 +3332,14 @@ def quick_query(query: str, params: Optional[Tuple] = None,
         return db.fetch_all(query, params)
 
 
-def bulk_insert(table: str, data: List[Dict], 
+def bulk_insert(table: str, data: list[dict], 
                 engine: str = "sqlite", **kwargs) -> int:
     """
     Bulk insert data into a table.
     
     Args:
         table: Table name
-        data: List of records
+        data: list of records
         engine: Database engine
         **kwargs: Connection parameters
         

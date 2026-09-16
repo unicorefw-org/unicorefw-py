@@ -16,7 +16,25 @@ UniCoreFW is a Universal Core Utility Library that provides a comprehensive suit
 
 ### Installation
 
-To use UniCoreFW in your project, simply import the module:
+Install the base package, or include the bounded cryptography dependency when
+the Fernet helpers are required:
+
+```bash
+pip install unicorefw
+pip install "unicorefw[core]"
+pip install "unicorefw[crypto]"
+pip install "unicorefw[orm]"
+pip install "unicorefw[database]"     # Python 3.9+
+pip install "unicorefw[spreadsheet]"  # Python 3.9+
+```
+
+The base/core installation has no third-party runtime dependency. The database
+extra contains bounded PostgreSQL, MySQL, MongoDB, and Redis drivers. The
+spreadsheet extra contains bounded pandas and openpyxl lines plus `defusedxml`
+for XML parser hardening. ORM dependencies remain separate and ORM internals
+are not part of the lazy-import optimization.
+
+Import the required entry points:
 
 ```python
 from unicorefw import _, UniCoreFW, UniCoreFWWrapper
@@ -58,39 +76,78 @@ UniCoreFW includes several security-oriented features:
 ### Input Validation
 
 ```python
-from unicorefw import validate_type, validate_callable
+from unicorefw import require_callable, validate_type
 
 # Validate a parameter's type
 value = validate_type("test", str, "string_param")
 
-# Validate that a parameter is callable
+# Confirm only that Python can call the object
 def my_func():
     pass
-validate_callable(my_func, "function_param")
+require_callable(my_func, "function_param")
 ```
 
-### String Sanitization
+Callable validation does not make an object trusted, pure, or safe to execute.
+Accept executable objects only from a trusted application boundary.
+
+### String Constraints
 
 ```python
 from unicorefw import sanitize_string
 
-# Sanitize a string with length and character constraints
-safe_string = sanitize_string("user input", max_length=50, allowed_chars="a-zA-Z0-9")
+# Apply length and character constraints
+constrained_string = sanitize_string(
+    "user input",
+    max_length=50,
+    allowed_chars="a-zA-Z0-9",
+)
 ```
+
+`sanitize_string()` is not contextual output encoding. `strip_html_tags()` and
+`strip_tags()` are also text transformations, not HTML sanitizers. Escape
+untrusted HTML text with `html.escape()` or use a maintained allow-list
+sanitizer when limited markup must be accepted.
 
 ### Rate Limiting
 
 ```python
-from unicorefw import RateLimiter
+from unicorefw import LocalRateLimiter
 
-# Create a rate limiter allowing 100 calls per minute
-limiter = RateLimiter(max_calls=100, time_window=60)
+# Allow 100 calls per minute in this Python process
+limiter = LocalRateLimiter(max_calls=100, time_window=60)
 
 # Use the rate limiter as a context manager
 with limiter:
     # Your rate-limited code here
     perform_operation()
 ```
+
+`LocalRateLimiter` is also exported as `RateLimiter` for compatibility. It uses
+bounded process memory, a monotonic clock, and a lock, but its state is not
+shared between processes or hosts. Distributed services need an atomic shared
+backend:
+
+```python
+from redis import Redis  # application dependency
+from unicorefw import DistributedRateLimiter, RedisRateLimitBackend
+
+backend = RedisRateLimitBackend(Redis.from_url(redis_url))
+limiter = DistributedRateLimiter(
+    backend,
+    key=authenticated_client_id,
+    max_calls=100,
+    time_window=60,
+)
+
+with limiter:
+    perform_operation()
+```
+
+The Redis backend deterministically hashes identifiers, uses Redis server time,
+and fails closed. Hashing removes the raw identifier from the key name but is
+not anonymization. The application remains responsible for Redis
+authentication, encryption, isolation, availability, eviction policy, and
+network-level abuse controls.
 
 ### Audit Logging
 
@@ -218,6 +275,13 @@ sample = UniCoreFW.sample([1, 2, 3, 4, 5], 2)  # e.g., [2, 4] (random)
 # Shuffle an array
 shuffled = UniCoreFW.shuffle([1, 2, 3, 4, 5])  # Random order
 ```
+
+`uniq`, `union`, `intersection`, `difference`, and `xor` preserve input order
+while using hash-backed membership for normally distributed hashable values.
+The common paths are O(n), or O(n + m) for two-input operations. Unhashable
+values and unhashable iteratee results fall back to equality scanning and can
+take O(n²). Comparator variants (`*_with`) are intentionally pairwise and
+remain quadratic because their contracts cannot assume hash-compatible keys.
 
 ### Object Functions
 
@@ -541,10 +605,10 @@ time.sleep(0.5)
 
 ```python
 import unicorefw as uc
-from unicorefw import RateLimiter, AuditLogger, sanitize_string
+from unicorefw import AuditLogger, LocalRateLimiter, sanitize_string
 
 # Setup security components
-rate_limiter = RateLimiter(max_calls=100, time_window=60)
+rate_limiter = LocalRateLimiter(max_calls=100, time_window=60)
 audit_logger = AuditLogger(log_file="data_processing.log")
 
 def process_user_input(user_id, user_input):
@@ -565,9 +629,9 @@ def process_user_input(user_id, user_input):
             audit_logger.log("DATA_PROCESS", f"User {user_id} processed data successfully")
       
             return result
-    except Exception as e:
-        # Log failure
-        audit_logger.log("ERROR", f"User {user_id} data processing failed: {str(e)}")
+    except Exception:
+        # Keep raw exception and input details out of persistent logs.
+        audit_logger.log("ERROR", {"user_id": user_id, "result": "rejected"})
         raise
 
 def perform_data_processing(data):
@@ -643,6 +707,58 @@ For HTML text nodes, import `html_template` from `unicorefw.template`. It escape
 untrusted values and rejects expressions inside tags, attributes, scripts, and
 styles. Both renderers require trusted template source.
 
+### SQLAlchemy Session Policy
+
+Install `unicorefw[orm]` plus the DBAPI driver that matches the database URL.
+The package does not select a PostgreSQL, MySQL, or async SQLite driver for the
+application.
+
+```python
+from unicorefw.orm import create_async_engine_from_url, create_async_sessionmaker
+from unicorefw.orm import session_scope
+
+engine = create_async_engine_from_url("sqlite+aiosqlite:///application.db")
+AsyncSessionLocal = create_async_sessionmaker(engine)
+
+async def update_record(record_id, new_value):
+    async with session_scope(AsyncSessionLocal) as session:
+        record = await session.get(Record, record_id)
+        record.value = new_value
+        await session.commit()
+```
+
+`session_scope()` rolls back if the body raises and lets the original exception
+continue to the caller. Existing one-item `async for` use remains supported,
+but `async with` gives the context manager access to body exceptions. Dispose
+the engine during application shutdown and keep database credentials in the
+deployment secret manager.
+
+### Authenticated String Encryption
+
+The optional crypto helpers encrypt and authenticate UTF-8 strings with
+Fernet. Use a TTL when tokens must expire, and handle all authentication
+failures as `InvalidToken`:
+
+```python
+from unicorefw.crypto import InvalidToken, decrypt_string, encrypt_string, generate_key
+
+key = generate_key()
+token = encrypt_string("confidential value", key)
+
+try:
+    value = decrypt_string(token, key, ttl=300)
+except InvalidToken:
+    value = None
+```
+
+Store keys in a dedicated secret manager, keep them out of source control and
+logs, and define a rotation procedure before issuing persistent tokens. Use
+`cryptography.fernet.MultiFernet` when a service must decrypt with an old key
+while encrypting with a new one. Fernet exposes token creation time in
+plaintext and holds the complete message in memory; use a streaming encryption
+design for large files. The package intentionally returns one authentication
+error for malformed, expired, corrupted, and wrong-key tokens.
+
 ## Security Best Practices
 
 When using UniCoreFW, follow these security best practices:
@@ -652,16 +768,25 @@ When using UniCoreFW, follow these security best practices:
    ```python
    validate_type(user_input, str, "user_input")
    ```
-2. **Sanitize string data**: Use sanitize_string for any user-provided text
+2. **Constrain and encode string data**: Use `sanitize_string` for explicit
+   length and character rules, then encode for the output context
 
    ```python
-   sanitized = sanitize_string(user_input, max_length=100, allowed_chars="a-zA-Z0-9")
+   import html
+
+   constrained = sanitize_string(
+       user_input,
+       max_length=100,
+       allowed_chars="a-zA-Z0-9",
+   )
+   html_text = html.escape(constrained)
    ```
-3. **Apply local rate limiting**: `RateLimiter` limits one Python process only;
-   use an atomic shared backend at service boundaries
+3. **Apply local or distributed rate limiting deliberately**:
+   `LocalRateLimiter` limits one Python process only; use
+   `DistributedRateLimiter` with an atomic shared backend at service boundaries
 
    ```python
-   with RateLimiter(max_calls=100, time_window=60):
+   with LocalRateLimiter(max_calls=100, time_window=60):
        process_request()
    ```
 4. **Maintain audit logs**: Use AuditLogger to track security events
@@ -672,7 +797,9 @@ When using UniCoreFW, follow these security best practices:
    ```
 5. **Use cryptographic randomness for security decisions**: Collection sampling
    and shuffling are not token, password, or key generators
-6. **Keep template source trusted**: Validation and callable checks do not make
+6. **Keep encryption keys outside application data and logs**: Store and rotate
+   them through a dedicated secret-management boundary
+7. **Keep template source trusted**: Validation and callable checks do not make
    arbitrary Python objects or attacker-authored templates safe
 
    ```python
@@ -682,6 +809,26 @@ When using UniCoreFW, follow these security best practices:
        "display_name": user_input,
    })
    ```
+
+## Repository Security Gates
+
+Required CI runs Bandit, strict dependency auditing, offline tracked-file
+secret detection, and CodeQL `security-extended` analysis. Medium and high
+findings fail, including CodeQL security severity 4.0 and above.
+
+Suppressions are reviewed temporary records. Bandit and intentional fixture
+exceptions require an exact scope, rationale, and future expiry inline. CodeQL
+exceptions use the rule and SARIF fingerprint in
+`security/suppressions.json`. The local verifier rejects blanket, mismatched,
+duplicate, malformed, and expired entries:
+
+```bash
+python scripts/verify_security_policy.py suppressions --root .
+```
+
+Secret detection is heuristic and scans the current repository snapshot. It
+does not inspect unreferenced Git history or replace provider-side secret
+scanning, push protection, credential rotation, or human review.
 
 ## Resource Budgets
 
@@ -710,8 +857,87 @@ except ResourceLimitError as error:
 
 Database imports accept `max_bytes`, `max_rows`, and `max_columns`. CSV import
 counts bytes during decoding and rolls back the transaction after a limit error.
-Excel import also checks ZIP member count, expanded bytes, and expansion ratio.
-Set these values in trusted application configuration.
+JSON, CSV, Excel, and dictionary imports include automatic table creation in the
+insert transaction. A failed row therefore rolls back both the data and a table
+created for that import. Excel import also checks ZIP member count, expanded
+bytes, and expansion ratio. Unexpected parser and driver failures use the
+redacted `DatabaseImportError` boundary; inspect `__cause__` in protected
+diagnostics. Set resource limits in trusted application configuration.
+
+`Database.transaction()` starts one root transaction and creates a generated
+savepoint for each nested context. An inner exception rolls back its savepoint
+without discarding outer work:
+
+```python
+with db.transaction():
+    db.insert("events", {"value": "outer"})
+    try:
+        with db.transaction():
+            db.insert("events", {"value": "inner"})
+            raise ValueError("reject inner work")
+    except ValueError:
+        pass
+```
+
+Nested success releases one savepoint; a later outer failure rolls back the
+released work. Direct `begin()`, `commit()`, and `rollback()` calls close one
+managed level at a time. Depth-zero commit and rollback calls invoke the driver
+as before.
+
+`with Database(...) as db` is a connection-owning transaction boundary. Entry
+begins a managed root transaction. Normal exit resolves nested levels and
+commits the root; exceptional exit rolls back every managed level. Cleanup runs
+even when commit or rollback fails. This prevents PostgreSQL's default helper
+autocommit mode from retaining writes after a context-body exception.
+
+`Database` records its creating process and thread. Operations from another
+thread raise `DatabaseError` before the shared cursor or connection is touched.
+Create a separate instance per thread. If legacy code already serializes all
+access, it can opt out of the thread check:
+
+```python
+db = Database(
+    engine="sqlite",
+    database="app.db",
+    check_same_thread=False,
+    unsafe_allow_cross_thread=True,
+)
+```
+
+The opt-out supplies no lock and does not change native driver settings. It
+therefore requires both driver support and application-level synchronization.
+It never permits use in a process created after the database instance. Create
+new connections after `fork()`.
+
+Driver failures during construction and pool acquisition use
+`DatabaseConnectionError`. Root begin, commit, rollback, and transaction-mode
+restoration failures use `DatabaseError`. These public messages do not contain
+connection parameters or driver text. The original exception remains in
+`__cause__` for protected diagnostics. Partial constructors and pool shutdown
+attempt every relevant close operation before reporting a cleanup failure.
+
+MySQL DDL may commit outside savepoint control; use native migration tooling
+when MySQL schema changes require transaction guarantees.
+
+The required integration job exercises these contracts against digest-pinned
+PostgreSQL 17.10 and MySQL 8.4.10 services. The suite is deliberately opt-in
+outside CI and accepts only `127.0.0.1`, the dedicated `unicorefw_test`
+database, the `unicorefw` user, and each engine's standard local port. These
+guards keep cleanup operations away from arbitrary databases.
+
+SQLite migration scripts use SQLite's parser for statement boundaries, which
+preserves semicolons inside quoted values and trigger bodies. Migration DDL and
+its tracking row commit or roll back together. Reusing an applied version with
+different SQL raises `DatabaseError` because its checksum changed. PostgreSQL
+migration scripts are passed intact to the DB-API driver. MySQL uses
+quote-aware and comment-aware statement boundaries to preserve default PyMySQL
+multi-statement compatibility. Use native migration tooling for MySQL scripts
+that require client-side `DELIMITER` directives.
+
+`DataImporter.from_sql()` is limited to trusted SQLite scripts. It runs the
+complete script in an isolated snapshot, blocks external database attachment
+and writable-schema pragmas, and changes the target only after the script
+succeeds.
 
 `memoize()` uses a thread-safe, process-local LRU with defaults of 256 entries,
 16 MiB estimated key/result weight, and a 300-second monotonic TTL. Its hard
@@ -756,19 +982,42 @@ provide `cancel()` and `pending_timer_count()`. `defer()` shares a process-wide
 
 For optimal performance when using UniCoreFW:
 
-1. Use memoization for expensive functions
+1. Import only the surface needed by the process
+
+   ```python
+   import unicorefw                 # dependency-free package metadata
+   from unicorefw import humanize   # loads only the owning core module
+   from unicorefw import crypto     # loads the optional crypto boundary
+   ```
+
+   The package root uses an explicit lazy-export map. A bare
+   `import unicorefw` does not import core utilities, cryptography, SQLAlchemy,
+   database drivers, pandas, or openpyxl. Database and ORM helpers are not
+   collection-chain methods.
+
+2. Prefer hashable keys for large set-like collection operations
+
+   ```python
+   unique_users = UniCoreFW.uniq_by(users, lambda user: user["id"])
+   ```
+
+   Hashable values and derived keys use the expected linear path. Unhashable
+   values preserve equality behavior but may require quadratic comparisons.
+   Comparator variants are also pairwise by contract.
+
+3. Use memoization for expensive functions
 
    ```python
    expensive_function = UniCoreFW.memoize(original_function)
    ```
-2. Be mindful of deep copying large objects
+4. Be mindful of deep copying large objects
 
    ```python
    # Consider whether you need a deep or shallow copy
    shallow_copy = UniCoreFW.clone(large_object)  # Faster
    deep_copy = UniCoreFW.deep_copy(large_object)  # More thorough but slower
    ```
-3. Chain operations efficiently
+5. Chain operations efficiently
 
    ```python
    # More efficient - processes data in a pipeline
@@ -781,7 +1030,7 @@ For optimal performance when using UniCoreFW:
    filtered = UniCoreFW.filter(data, criteria)
    result = UniCoreFW.map(filtered, transform)
    ```
-4. Use the appropriate collection function for your needs
+6. Use the appropriate collection function for your needs
 
    ```python
    # If you only need one matching item, use find instead of filter

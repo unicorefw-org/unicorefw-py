@@ -12,11 +12,12 @@ the Free Software Foundation.
 You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
+import math
 import re
 import types
-import math
-from collections.abc import Sequence, Set
-from typing import Any, List, Mapping, Tuple
+from collections.abc import Mapping, Sequence
+from typing import Any
+
 
 def is_string(obj: Any) -> bool:
     """
@@ -488,8 +489,8 @@ def is_equal(obj1: Any, obj2: Any) -> bool:
         return obj1 == obj2
 
     # Iterative DFS with cycle detection on (id(a), id(b)) pairs
-    seen: set[Tuple[int, int]] = set()
-    stack: List[Tuple[Any, Any]] = [(obj1, obj2)]
+    seen: set[tuple[int, int]] = set()
+    stack: list[tuple[Any, Any]] = [(obj1, obj2)]
 
     while stack:
         a, b = stack.pop()
@@ -518,12 +519,12 @@ def is_equal(obj1: Any, obj2: Any) -> bool:
             if a.keys() != b.keys():  # type: ignore[arg-type]
                 return False
             # Compare corresponding values
-            for k in a.keys():
+            for k in a:
                 stack.append((a[k], b[k]))  # type: ignore[index]
             continue
 
         # Sets (unordered)
-        if isinstance(a, Set) and not isinstance(a, (str, bytes, bytearray)):
+        if isinstance(a, set) and not isinstance(a, (str, bytes, bytearray)):
             # Direct set equality is fine
             if a != b:  # type: ignore[comparison-overlap]
                 return False

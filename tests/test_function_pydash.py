@@ -1,14 +1,15 @@
 #import unittest
+import os
+import sys
 import time
 from unittest import mock
+
 import pytest
-import sys
-import os
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from unicorefw import _ # Now you can import Unicore as usual
 sys.dont_write_bytecode = True
+from unicorefw import _  # Now you can import Unicore as usual
 
 parametrize = pytest.mark.parametrize
 
@@ -363,7 +364,7 @@ def test_throttle():
         result = throttled()
         present = _.now()
 
-    assert result == expected
+    assert result == expected # type: ignore
 
     time.sleep(100 / 1000.0)
     assert throttled() > expected

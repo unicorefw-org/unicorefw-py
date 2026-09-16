@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
+import re
+import sys
 import threading
 import time
 import zipfile
@@ -11,15 +14,37 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
+
 from unicorefw.db import CacheManager, Database, DataImporter, _validate_zip_expansion
 from unicorefw.function import debounce
 from unicorefw.object import get, set_
 from unicorefw.regex_policy import RegexLimits, unsafe_raw_regex
 from unicorefw.security import InputValidationError, ResourceLimitError, SecurityError
 from unicorefw.string import regex_find_all, regex_replace, regex_test
-from unicorefw.supporter import PathLimits, _ensure_container, _ensure_len
+from unicorefw.supporter import (
+    PathLimits,
+    _as_parts_any,
+    _call_customizer,
+    _ensure_container,
+    _ensure_len,
+    _flatten,
+    _get_by_path,
+    _is_containerish,
+    _is_int_str,
+    _iter_items_like,
+    _normalize_customizer,
+    _parse_js_regex,
+    _parse_path,
+    _parse_path_str,
+    _set_by_path,
+    _try_asyncio_schedule,
+    _try_import,
+    _validate_callable,
+)
 from unicorefw.template import TemplateLimits, html_template, template
-from unicorefw.utils import decompress, memoize
+from unicorefw.utils import compress, decompress, max_value, memoize, min_value
 
 
 def _database_with_items_table() -> Database:
@@ -49,6 +74,31 @@ def test_decompress_rejects_unsafe_limit_overrides():
 
     with pytest.raises(InputValidationError, match="finite"):
         decompress("1a", max_compression_ratio=float("nan"))
+
+
+def test_compress_handles_empty_input_and_long_runs():
+    assert compress("") == ""
+    assert compress("a" * 10) == "9a1a"
+    assert compress("aaabcc") == "3a1b2c"
+
+
+def test_decompress_validates_input_type_and_limits():
+    with pytest.raises(TypeError, match="comp must be a string"):
+        decompress(None)  # type: ignore[arg-type]
+
+    with pytest.raises(ResourceLimitError, match="compressed input length"):
+        decompress("1a", max_input_length=1)
+
+    with pytest.raises(ResourceLimitError, match="decompressed output length"):
+        decompress("2a", max_output_length=1)
+
+
+def test_extrema_support_empty_arrays_and_key_functions():
+    assert max_value([]) is None
+    assert min_value([]) is None
+    records = [{"name": "a", "score": 2}, {"name": "b", "score": 5}]
+    assert max_value(records, key_func=lambda item: item["score"])["name"] == "b" # type: ignore
+    assert min_value(records, key_func=lambda item: item["score"])["name"] == "a" # type: ignore
 
 
 def test_template_enforces_token_and_nesting_limits():
@@ -114,13 +164,13 @@ def test_memoize_enforces_lru_entry_limit_and_ttl():
     assert cached(3) == 6
     assert cached(2) == 4
     assert calls == [1, 2, 3, 2]
-    assert cached.cache_info()["entries"] == 2
+    assert cached.cache_info()["entries"] == 2 # type: ignore
 
     current_time[0] = 11
     assert cached(2) == 4
     assert calls == [1, 2, 3, 2, 2]
-    cached.cache_clear()
-    assert cached.cache_info()["entries"] == 0
+    cached.cache_clear() # type: ignore
+    assert cached.cache_info()["entries"] == 0 # type: ignore
 
 
 def test_memoize_skips_entries_over_weight_budget_and_validates_settings():
@@ -172,7 +222,7 @@ def test_memoize_resolves_concurrent_duplicate_insertions():
     assert not any(thread.is_alive() for thread in threads)
     assert results == [4, 4]
     assert call_count == 2
-    assert cached.cache_info()["entries"] == 1
+    assert cached.cache_info()["entries"] == 1 # type: ignore
 
 
 def test_query_cache_is_bounded_expires_and_isolates_mutable_results():
@@ -279,15 +329,15 @@ def test_debounce_rejects_timer_thread_flood(monkeypatch):
     with pytest.raises(ResourceLimitError, match="pending debounce timers"):
         wrapped()
 
-    assert wrapped.pending_timer_count() == 1
-    wrapped.cancel()
+    assert wrapped.pending_timer_count() == 1 # type: ignore
+    wrapped.cancel() # type: ignore
 
 
 def test_debounce_validates_timer_budgets():
     with pytest.raises(InputValidationError, match="max_pending_timers"):
         debounce(lambda: None, 1, max_pending_timers=0)
     with pytest.raises(InputValidationError, match="wait"):
-        debounce(lambda: None, float("nan"))
+        debounce(lambda: None, float("nan")) # type: ignore
 
 
 def test_debounce_releases_budget_after_start_and_callback_failures(monkeypatch):
@@ -300,7 +350,7 @@ def test_debounce_releases_budget_after_start_and_callback_failures(monkeypatch)
     wrapped = debounce(lambda: None, 1)
     with pytest.raises(RuntimeError, match="thread start blocked"):
         wrapped()
-    assert wrapped.pending_timer_count() == 0
+    assert wrapped.pending_timer_count() == 0 # type: ignore
 
     monkeypatch.undo()
     called = threading.Event()
@@ -313,11 +363,11 @@ def test_debounce_releases_budget_after_start_and_callback_failures(monkeypatch)
     wrapped()
     assert called.wait(timeout=2)
     for _ in range(100):
-        if wrapped.pending_timer_count() == 0:
+        if wrapped.pending_timer_count() == 0: # type: ignore
             break
         time.sleep(0.01)
-    assert wrapped.pending_timer_count() == 0
-    wrapped.cancel()
+    assert wrapped.pending_timer_count() == 0 # type: ignore
+    wrapped.cancel() # type: ignore
 
 
 def test_nested_path_limits_preflight_depth_and_list_growth():
@@ -359,6 +409,114 @@ def test_nested_path_limits_reject_source_and_unsafe_overrides():
         _ensure_container([], 3, max_list_length=3)
     with pytest.raises(ResourceLimitError, match="auto-created list length"):
         _ensure_len([], 4, max_list_length=3)
+
+
+def test_supporter_path_parsing_and_item_adapters_cover_edge_forms():
+    assert _parse_path(2) == [2]
+    assert _parse_path("a..b[2]") == ["a", "b", 2]
+    assert _parse_path_str(r"a\.b[ (2,) ].c") == ["a.b", (2,), "c"]
+    assert _parse_path_str("a[three]") == ["a", "three"]
+    assert _as_parts_any(("a", "b")) == [("a", "b")]
+    assert list(_iter_items_like(None)) == []
+    assert list(_iter_items_like("value")) == [(0, "value")]
+
+    class ItemSource:
+        def iteritems(self):
+            return [("x", 1)]
+
+    class AttributeSource:
+        def __init__(self):
+            self.value = 2
+
+    assert list(_iter_items_like(ItemSource())) == [("x", 1)]
+    assert list(_iter_items_like(AttributeSource())) == [("value", 2)]
+
+
+def test_supporter_customizer_and_container_branches():
+    assert _is_int_str("-12")
+    assert not _is_int_str("+12")
+    assert _normalize_customizer(None) is None
+    assert _normalize_customizer({}) is dict
+    customizer = lambda value: value + 1
+    assert _normalize_customizer(customizer) is customizer
+    assert _call_customizer(lambda value, key, parent: value + key, 2, 3, {}) == 5
+    assert _call_customizer(lambda value, key: value + key, 2, 3, {}) == 5
+    assert _call_customizer(lambda value: value + 1, 2, 3, {}) == 3
+
+    mapping = {}
+    created, exists = _ensure_container(mapping, "child", ctor=list)
+    assert created == [] and not exists
+    existing, exists = _ensure_container(mapping, "child")
+    assert existing is created and exists
+
+
+def test_supporter_path_and_scheduler_fallbacks():
+    assert _get_by_path({"a": {"b": 2}}, ["a", "b"]) == 2
+    assert _get_by_path({"a": 1}, ["missing"]) is None
+    assert _get_by_path(object(), ["missing"]) is None
+    result = {}
+    _set_by_path(result, ["items", 0], "value", {})
+    assert result == {"items": ["value"]}
+    with pytest.raises(TypeError):
+        _set_by_path({}, [0], "value", {})
+    assert _flatten(None) == []
+    assert _flatten([[1], [2]], -1) == [[[1], [2]]]
+    assert _parse_js_regex("not-a-literal") == ("not-a-literal", 0, False)
+    assert _try_import("module_that_does_not_exist") is None
+    assert _try_asyncio_schedule(object(), lambda: None, (), {}) is False
+    with pytest.raises(TypeError):
+        _validate_callable(1)
+
+
+def test_supporter_nested_mutation_and_attribute_edges():
+    class Holder:
+        pass
+
+    holder = Holder()
+    created, exists = _ensure_container(holder, "child", prefer_list_index=True)
+    assert created == [] and not exists and holder.child is created # type: ignore
+    assert _is_containerish((1, 2)) is False
+    assert _get_by_path({"a": None}, ["a", "b"]) is None
+
+    nested = {"items": [{}]}
+    _set_by_path(nested, ["items", 0, "name"], "value", {})
+    assert nested == {"items": [{"name": "value"}]}
+    with pytest.raises(TypeError):
+        _set_by_path({}, [0, "name"], "value", {})
+    with pytest.raises(TypeError):
+        _set_by_path("bad", ["name"], "value", {}) # type: ignore
+    assert _parse_path_str("a\\") == ["a"]
+    _set_by_path({"items": [None]}, ["items", 0, 1], "value", {})
+    with pytest.raises(TypeError):
+        _set_by_path({"items": []}, ["items", "name", "extra"], "value", {})
+    _set_by_path({}, [], "value", {})
+    assert _flatten([[1], [2]], -2) == [[1], [2]]
+    assert _parse_path_str("a[]") == ["a"]
+
+
+def test_supporter_regex_scheduler_success_and_missing_delimiter():
+    assert _parse_js_regex("/abc") == ("/abc", 0, False)
+    assert _parse_js_regex("/abc/ms") == ("abc", re.MULTILINE | re.DOTALL, False)
+    assert _parse_js_regex("/abc/x") == ("abc", 0, False)
+    assert _parse_path_str("a[01]") == ["a", 1]
+
+    class Loop:
+        def __init__(self):
+            self.called = False
+
+        def call_soon_threadsafe(self, func, *args, **kwargs):
+            self.called = True
+            func(*args, **kwargs)
+
+    loop = Loop()
+    class Asyncio:
+        @staticmethod
+        def get_running_loop():
+            return loop
+
+    seen = []
+    assert _try_asyncio_schedule(Asyncio, seen.append, (3,), {}) is True
+    assert seen == [3] and loop.called
 
 
 def test_regex_policy_rejects_backtracking_and_resource_exhaustion():
@@ -640,3 +798,7 @@ def test_excel_import_enforces_row_limit(tmp_path: Path):
         )
     finally:
         db.close()
+
+
+def test_flatten_boolean_depth_compatibility():
+    assert _flatten([[1], [2, [3]]], depth=True) == [1, 2, [3]]

@@ -9,14 +9,16 @@
 # You should have received a copy of the [BSD-3-Clause] license                             #
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.                          #
 #############################################################################################
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from unicorefw import _  # Now you can import Unicore as usual
 sys.dont_write_bytecode = True
+
+from unicorefw import _  # Now you can import Unicore as usual
+from unicorefw.array import _exclude_values
 
 
 class TestUnicoreArrays(unittest.TestCase):
@@ -145,6 +147,16 @@ class TestUnicoreArrays(unittest.TestCase):
         found_exception = _.find(arr, raiser)
         self.assertIsNone(found_exception)
 
+    def test_find_first_last_reduce_and_without_edge_paths(self):
+        with self.assertRaises(TypeError):
+            _.find(1, lambda value: True)
+        with self.assertRaises(TypeError):
+            _.find([1], None)
+        self.assertEqual(_.first(n=2), [])
+        self.assertEqual(_.last(n=2), [])
+        self.assertEqual(_.reduce([1, 2], lambda left, right: left + right, None), 3)
+        self.assertEqual(_.without([[1], [2]], [1]), [[2]])
+
     def test_last(self):
         # Single list argument
         self.assertEqual(_.last([1, 2, 3]), 3, "Should return the last element")
@@ -164,6 +176,156 @@ class TestUnicoreArrays(unittest.TestCase):
             7,
             "If called like last(5,6,7) => returns the last argument",
         )
+        self.assertEqual(_.last(5), 5)
+        self.assertEqual(_.last([1, 2], 1), [2])
+        self.assertEqual(_.last([1, 2], 0), [])
+
+    def test_unzip_last_index_and_chunk_boundaries(self):
+        self.assertEqual(_.unzip([]), [])
+        with self.assertRaises(ValueError):
+            _.unzip([(1,), (2, 3)])
+        self.assertEqual(_.last_index_of([], 1), -1)
+        self.assertEqual(_.chunk([1, 2], 0), [])
+
+    def test_sampling_indexing_and_grouping_validation_edges(self):
+        self.assertEqual(_.sample([1, 2], 0), [])
+        self.assertIn(_.sample([1, 2], 1), [1, 2])
+        rows = [{"id": 1}, {"id": 2}]
+        self.assertEqual(_.index_by(rows, lambda row: row["id"]), {1: rows[0], 2: rows[1]})
+        with self.assertRaises(TypeError):
+            _.count_by(1, lambda value: value)
+        with self.assertRaises(TypeError):
+            _.count_by([1], None)
+        self.assertEqual(_.count_by([1, 2, 3], lambda value: 1 / (value - 2)), {-1.0: 1, 1.0: 1})
+        with self.assertRaises(TypeError):
+            _.group_by(1, lambda value: value)
+        with self.assertRaises(TypeError):
+            _.group_by([1], None)
+        self.assertEqual(_.group_by([1, 2, 3], lambda value: 1 / (value - 2)), {-1.0: [1], 1.0: [3]})
+
+    def test_array_extrema_empty_and_key_paths(self):
+        self.assertIsNone(_.max_value([]))
+        self.assertIsNone(_.min_value([]))
+        self.assertEqual(_.max_value([1, 3, 2]), 3)
+        self.assertEqual(_.min_value([1, 3, 2]), 1)
+        rows = [{"score": 2}, {"score": 5}]
+        self.assertEqual(_.max_value(rows, key_func=lambda row: row["score"]), rows[1])
+        self.assertEqual(_.min_value(rows, key_func=lambda row: row["score"]), rows[0])
+
+    def test_median_partition_adjustment_paths(self):
+        self.assertEqual(_.find_median_sorted_arrays([10, 11], [1, 2, 3, 4, 5, 6]), 4.5)
+        self.assertEqual(_.find_median_sorted_arrays([1, 2, 3, 4], [10]), 3.0)
+
+    def test_drop_fill_and_index_scalar_boundaries(self):
+        self.assertEqual(_.drop_while([1, 2], lambda value: True), [])
+        self.assertEqual(_.drop_right_while([1, 2], lambda value: True), [])
+        values = []
+        self.assertIs(_.fill(values, 1), values)
+        self.assertEqual(_.find_index([1, 2, 3], 2), 1)
+        self.assertEqual(_.find_last_index([1, 2, 1], 1), 2)
+
+    def test_flatten_intersection_intersperse_and_nth_edges(self):
+        self.assertEqual(_.flatten_depth([[1], [2]], 0), [[1], [2]])
+        self.assertEqual(_.flatten_depth(None), [])
+        self.assertEqual(_.flatten_depth(3), [3])
+        self.assertEqual(_.intersection_with([1, 1, 2], [1, 2]), [1, 2])
+        self.assertEqual(_.intersperse([1], 0), [1])
+        self.assertIsNone(_.nth([1, 2], 9))
+        self.assertIsNone(_.nth([1, 2], -9))
+
+    def test_shift_take_while_and_unhashable_uniq_by_edges(self):
+        values = []
+        self.assertIsNone(_.shift(values))
+        self.assertEqual(_.take_while([1, 2], lambda value: True), [1, 2])
+        self.assertEqual(_.uniq_by([[1], [1], [2]], lambda value: value), [[1], [2]])
+        self.assertEqual(_.without([[1]], 1), [[1]])
+        self.assertEqual(_exclude_values([[1], [2]], (1,)), [[1], [2]])
+
+    def test_nested_zip_intercalate_pop_and_slice_edges(self):
+        self.assertEqual(_.zip_object_deep(["a.b", "a.c"], [1, 2]), {"a": {"b": 1, "c": 2}})
+        with self.assertRaises(TypeError):
+            _.zip_object_deep(["0"], [1])
+        self.assertEqual(_.intercalate([1, [2]], [0]), [1, 0, 2])
+        with self.assertRaises(IndexError):
+            _.pop([])
+        values = [1, 2, 3]
+        self.assertEqual(_.pop(values, -1), 3)
+        self.assertEqual(_.slice_("abc", 9), [])
+
+    def test_pull_at_reduce_comparator_and_sort_validation_edges(self):
+        values = list(range(12))
+        self.assertEqual(_.pull_at(values, list(range(9))), [9, 10, 11])
+        self.assertEqual(_.ft_reduce(lambda left, right: left + right, [1, 2, 3]), 6)
+        self.assertEqual(_.ft_reduce(lambda left, right: left + right, [], 4), 4)
+        with self.assertRaises(TypeError):
+            _.ft_reduce(lambda left, right: left + right, [])
+        key = _.ft_cmp_to_key(lambda left, right: left - right)
+        self.assertEqual(sorted([3, 1, 2], key=key), [1, 2, 3])
+        with self.assertRaises(TypeError):
+            _.sort(tuple([2, 1]))
+        with self.assertRaises(TypeError):
+            _.sort([2, 1], comparator=1)
+        with self.assertRaises(TypeError):
+            _.sort([2, 1], key=1)
+        self.assertEqual(_.sort([]), [])
+
+    def test_unzip_with_and_zip_with_validation_edges(self):
+        self.assertEqual(_.unzip_with([]), [])
+        self.assertEqual(_.unzip_with([[1, 2], [3, 4]], lambda left, right: left + right), [4, 6])
+        with self.assertRaises(TypeError):
+            _.unzip_with("bad")
+        with self.assertRaises(TypeError):
+            _.unzip_with([[1], 2])
+        self.assertEqual(_.unzip_with([[], [1]]), [])
+        with self.assertRaises(TypeError):
+            _.unzip_with([[1]], 1)
+        with self.assertRaises(TypeError):
+            _.unzip_with([[1]], lambda value: value + "x")
+        self.assertEqual(_.zip_with(), [])
+
+    def test_array_remaining_validation_and_comparator_paths(self):
+        # Exercise every rich-comparison operator exposed by the comparator key.
+        key_type = _.ft_cmp_to_key(lambda left, right: left - right)
+        left, right = key_type(1), key_type(2)
+        self.assertTrue(left < right)
+        self.assertTrue(right > left)
+        self.assertTrue(left <= right)
+        self.assertTrue(right >= left)
+        self.assertTrue(left != right)
+        self.assertTrue(left == key_type(1))
+
+        self.assertEqual(_.uniq_by((1, 2, 1), lambda value: value), [1, 2])
+        self.assertEqual(
+            _.zip_object_deep(["items[0].name", "items[1].name"], ["a", "b"]),
+            {"items": [{"name": "a"}, {"name": "b"}]},
+        )
+        self.assertEqual(
+            _.zip_object_deep([["items[0].name", "a"], ["items[1].name", "b"]]),
+            {"items": [{"name": "a"}, {"name": "b"}]},
+        )
+        self.assertEqual(_.zip_object_deep(["items[0]"], ["a"]), {"items": ["a"]})
+        self.assertEqual(
+            _.zip_object_deep(["items[0]", "items[0].name"], ["old", "new"]),
+            {"items": [{"name": "new"}]},
+        )
+        with self.assertRaises(TypeError):
+            _.sort([1, 2], comparator=lambda left, right: left + "x")
+        self.assertEqual(_.xor_with([1, 2], lambda left, right: left == right), [1, 2])
+        self.assertEqual(_.xor_with([1, 2], [2, 3], lambda left, right: left == right), [1, 3])
+        self.assertEqual(
+            _.xor_with([1, 2], [2, 3], [3, 4], lambda left, right: left == right),
+            [1, 4],
+        )
+        with self.assertRaises(ValueError):
+            _.xor_with([1])
+        with self.assertRaises(TypeError):
+            _.xor_with([1], 1)
+        with self.assertRaises(TypeError):
+            _.xor_with([1], "bad", lambda left, right: left == right)
+        with self.assertRaises(TypeError):
+            _.xor_with([1], [2], lambda left, right: left + "x")
+        with self.assertRaises(TypeError):
+            _.xor_with([1], [2], lambda left, right: right + "x")
 
     def test_uniq(self):
         arr = [1, 2, 2, 3, 1, 4]
@@ -275,10 +437,10 @@ class TestUnicoreArrays(unittest.TestCase):
     def test_invoke(self):
         class TestClass:
             def double(self):
-                return self.value * 2
+                return self.value * 2 # type: ignore
 
         obj = TestClass()
-        obj.value = 5
+        obj.value = 5 # type: ignore
         result = _.invoke([obj], "double")
         self.assertEqual(
             result, [10], "Should invoke the method on each object in the array"

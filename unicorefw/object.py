@@ -12,42 +12,52 @@ the Free Software Foundation.
 You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
-from typing import (
-    Any, Callable, Dict, Iterable, List, 
-    Mapping, MutableMapping, Optional, 
-    Tuple, TypeVar, Union
+import builtins
+import inspect
+import math
+import random
+import re
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
+
+# runtime ABC (for isinstance checks)
+from collections.abc import (
+    Mapping as AbcMapping,
 )
+from collections.abc import (
+    MutableMapping as AbcMutableMapping,
+)
+from collections.abc import (
+    Sequence as AbcSequence,
+)
+from copy import deepcopy as _copy_deepcopy
+from typing import (
+    Any,
+    Optional,
+    TypeVar,
+    Union,
+)
+
+from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
 from .supporter import (
     PathLimits,
-    _ensure_container,
-    _flatten as _flatten_nested,
-    _flatten_keys, 
-    _iter_items_like,
-    _is_int_str,
-    _call_customizer,
-    _is_containerish,
-    _ensure_len,
     _as_parts_any,
+    _call_customizer,
+    _ensure_container,
+    _ensure_len,
+    _flatten_keys,
+    _is_containerish,
+    _is_int_str,
+    _iter_items_like,
     _resolve_path_limits,
     _set_by_path,
     _split_apply_args,
     # _normalize_customizer,
     # _parse_path_str
 )
-from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
-from copy import deepcopy as _copy_deepcopy
-import math
-import re
-import random
-import inspect
-import builtins
-
-# runtime ABC (for isinstance checks)
-from collections.abc import (
-    Mapping as AbcMapping,
-    MutableMapping as AbcMutableMapping,
-    Sequence as AbcSequence,
+from .supporter import (
+    _flatten as _flatten_nested,
 )
+
 _RESTRICTED = {"__globals__", "__builtins__"}  # keep restriction *narrow*
 _MISSING = builtins.object()
 _dict_init = dict.__init__
@@ -65,8 +75,8 @@ def _clone_builtin_containers(obj: Any) -> Any:
         return _copy_deepcopy(obj)
 
     root = {} if isinstance(obj, dict) else [None] * len(obj)
-    memo: Dict[int, Any] = {id(obj): root}
-    stack: List[Tuple[Any, Any]] = [(obj, root)]
+    memo: dict[int, Any] = {id(obj): root}
+    stack: list[tuple[Any, Any]] = [(obj, root)]
 
     while stack:
         source, target = stack.pop()
@@ -97,7 +107,7 @@ def _clone_builtin_containers(obj: Any) -> Any:
     return root
 
 
-def invoke(obj: Any, path: Union[str, List[Union[str, int]]], *args, **kwargs) -> Any:
+def invoke(obj: Any, path: str | list[str | int], *args, **kwargs) -> Any:
     """
     - If `obj` is NOT a sequence: resolve `path` on `obj` and call the final method → scalar.
     - If `obj` IS a list/tuple *and* the first segment isn't an int index: apply the same
@@ -105,7 +115,7 @@ def invoke(obj: Any, path: Union[str, List[Union[str, int]]], *args, **kwargs) -
 
     Args:
         obj (Any): The object to resolve the path on.
-        path (Union[str, List[Union[str, int]]]): The path to resolve.
+        path (Union[str, list[Union[str, int]]]): The path to resolve.
         *args: Positional arguments to pass to the resolved method.
         **kwargs: Keyword arguments to pass to the resolved method.
 
@@ -149,7 +159,7 @@ def invoke(obj: Any, path: Union[str, List[Union[str, int]]], *args, **kwargs) -
             return None
         try:
             return fn(*args, **kwargs)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     # Map-style: top-level list/tuple AND path doesn't start with an explicit index
@@ -176,7 +186,7 @@ def iterator(obj):
     """
     return _iter_items_like(obj)
 
-def extend(obj: Dict[K, V], *sources: Dict) -> Dict[K, V]:
+def extend(obj: dict[K, V], *sources: dict) -> dict[K, V]:
     """
     Extend obj by copying properties from sources.
 
@@ -199,7 +209,7 @@ def has(
     collection: Any,
     path: Any,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ) -> bool:
     """
     Return True if `path` exists in `collection` (dict, list/tuple/sequence, object).
@@ -286,7 +296,7 @@ def has(
 
 def defaults(
     obj: MutableMapping[K, V],
-    *defaults_dicts: Union[Mapping[K, V], Iterable[Tuple[K, V]]]
+    *defaults_dicts: Mapping[K, V] | Iterable[tuple[K, V]]
 ) -> MutableMapping[K, V]:
     """
     Fill missing keys on `obj` from one or more defaults sources (left→right).
@@ -375,7 +385,7 @@ def defaults(
         try:
             for k, v in items:
                 if k not in obj:
-                    obj[k] = v
+                    obj[k] = v # type: ignore
         except (TypeError, ValueError) as e:
             raise TypeError(
                 "Each default must be a mapping or iterable of (key, value) pairs."
@@ -383,7 +393,7 @@ def defaults(
 
     return obj
 
-def create(proto: Dict) -> Dict:
+def create(proto: dict) -> dict:
     """
     Create an object that inherits from the given prototype (dictionary).
 
@@ -411,7 +421,7 @@ def create(proto: Dict) -> Dict:
     return Obj()
 
 
-def pairs(obj: Dict[K, V]) -> List[Tuple[K, V]]:
+def pairs(obj: dict[K, V]) -> list[tuple[K, V]]:
     """
     Convert an object into an array of [key, value] pairs.
 
@@ -428,7 +438,7 @@ def pairs(obj: Dict[K, V]) -> List[Tuple[K, V]]:
     return list(obj.items())
 
 
-def result(obj: Dict, property_name: str, *args) -> Any:
+def result(obj: dict, property_name: str, *args) -> Any:
     """
     If the property is a function, invoke it with args; otherwise, return the property value.
 
@@ -453,7 +463,7 @@ def result(obj: Dict, property_name: str, *args) -> Any:
     return value
 
 
-def size(obj: Union[Dict, List, Any]) -> int:
+def size(obj: dict | list | Any) -> int:
     """
     Return the number of values in obj (works for dicts, lists, etc.).
 
@@ -472,7 +482,7 @@ def size(obj: Union[Dict, List, Any]) -> int:
     return sum(1 for _ in obj)
 
 
-def to_array(obj: Union[Dict, List, Any]) -> List:
+def to_array(obj: dict | list | Any) -> list:
     """
     Convert obj into an array (list in Python).
 
@@ -495,7 +505,7 @@ def to_array(obj: Union[Dict, List, Any]) -> List:
     return [obj]
 
 
-def where(obj_list: List[Dict], properties: Dict) -> List[Dict]:
+def where(obj_list: list[dict], properties: dict) -> list[dict]:
     """
     Return an array of all objects in obj_list that match the key-value pairs in properties.
 
@@ -515,7 +525,7 @@ def where(obj_list: List[Dict], properties: Dict) -> List[Dict]:
     ]
 
 
-def object(keys: List[K], values: List[V]) -> Dict[K, V]:
+def object(keys: list[K], values: list[V]) -> dict[K, V]:
     """
     Create an object (dictionary) from the given keys and values.
 
@@ -538,7 +548,7 @@ def object(keys: List[K], values: List[V]) -> Dict[K, V]:
     return {keys[i]: values[i] for i in range(len(keys))}
 
 
-def map_object(obj: Dict[K, V], func: Callable[[V], U]) -> Dict[K, U]:
+def map_object(obj: dict[K, V], func: Callable[[V], U]) -> dict[K, U]:
     """
     Apply func to each value in obj, returning a new object with the transformed values.
 
@@ -556,7 +566,7 @@ def map_object(obj: Dict[K, V], func: Callable[[V], U]) -> Dict[K, U]:
     return {k: func(v) for k, v in obj.items()}
 
 
-def all_keys(obj: Dict) -> List:
+def all_keys(obj: dict) -> list:
     """
     Return all the keys of a dictionary, including inherited ones.
 
@@ -579,7 +589,7 @@ def all_keys(obj: Dict) -> List:
         raise TypeError("The input must be a dictionary.")
 
 
-def is_match(obj: Dict, attrs: Dict) -> bool:
+def is_match(obj: dict, attrs: dict) -> bool:
     """
     Check if obj has key-value pairs that match attrs.
 
@@ -597,7 +607,7 @@ def is_match(obj: Dict, attrs: Dict) -> bool:
     return all(obj.get(k) == v for k, v in attrs.items())
 
 
-def functions(obj: Dict) -> List[str]:
+def functions(obj: dict) -> list[str]:
     """
     Return the names of all explicitly defined functions in an object (dictionary).
 
@@ -642,7 +652,7 @@ def deep_copy(obj: Any) -> Any:
 ####################################################################################
 #  Extended Object Functions
 ####################################################################################
-def at(obj: Dict[Any, Any], *paths: str) -> List[Any]:
+def at(obj: dict[Any, Any], *paths: str) -> list[Any]:
     """
     Retrieves the value at the given path of the object.
 
@@ -660,7 +670,7 @@ def at(obj: Dict[Any, Any], *paths: str) -> List[Any]:
         >>> at({'a': {'b': 2}}, 'a.b')
         [2]
     """
-    results: List[Any] = []
+    results: list[Any] = []
     for path in paths:
         current = obj
         # split on dots and brackets
@@ -672,7 +682,7 @@ def at(obj: Dict[Any, Any], *paths: str) -> List[Any]:
                 try:
                     idx = int(p)
                     current = current[idx]
-                except Exception:
+                except Exception:  # noqa: BLE001
                     current = None
             else:
                 current = None
@@ -683,9 +693,9 @@ def at(obj: Dict[Any, Any], *paths: str) -> List[Any]:
 
 
 def filter_(
-    collection: Union[Dict[Any, Any], List[Any]],
-    predicate: Optional[Callable[[Any], bool]] = None,
-) -> List[Any]:
+    collection: dict[Any, Any] | list[Any],
+    predicate: Callable[[Any], bool] | None = None,
+) -> list[Any]:
     """
     Filters elements of a collection based on a predicate function.
 
@@ -708,8 +718,8 @@ def filter_(
 
 
 def find_last(
-    collection: Union[Dict[Any, Any], List[Any]],
-    predicate: Optional[Callable[[Any], bool]] = None,
+    collection: dict[Any, Any] | list[Any],
+    predicate: Callable[[Any], bool] | None = None,
 ) -> Any:
     """
     Finds the last element in a collection that satisfies the predicate.
@@ -734,7 +744,7 @@ def find_last(
     return None
 
 
-def flat_map(collection: List[Any], func: Callable[[Any], List[Any]]) -> List[Any]:
+def flat_map(collection: list[Any], func: Callable[[Any], list[Any]]) -> list[Any]:
     """
     Creates a flattened list of values by running each element in collection through `func` and
     flattening the mapped results.
@@ -751,7 +761,7 @@ def flat_map(collection: List[Any], func: Callable[[Any], List[Any]]) -> List[An
         >>> flat_map([1, 2], duplicate)
         [[1, 1], [2, 2]]
     """
-    result: List[Any] = []
+    result: list[Any] = []
     for x in collection:
         res = func(x)
         if isinstance(res, (list, tuple)):
@@ -759,7 +769,7 @@ def flat_map(collection: List[Any], func: Callable[[Any], List[Any]]) -> List[An
     return result
 
 
-def flat_map_deep(collection: List[Any], func: Callable[[Any], List[Any]]) -> List[Any]:
+def flat_map_deep(collection: list[Any], func: Callable[[Any], list[Any]]) -> list[Any]:
     """
     Recursively flat maps a given collection. This is similar to :func:`flat_map`, but
     will continue to flatten the mapped results until they are no longer iterable.
@@ -780,8 +790,8 @@ def flat_map_deep(collection: List[Any], func: Callable[[Any], List[Any]]) -> Li
 
 
 def flat_map_depth(
-    collection: List[Any], func: Callable[[Any], List[Any]], depth: int
-) -> List[Any]:
+    collection: list[Any], func: Callable[[Any], list[Any]], depth: int
+) -> list[Any]:
     """
     Recursively flat maps a given collection up to the given depth. This is similar
     to :func:`flat_map`, but will continue to flatten the mapped results until they
@@ -805,8 +815,8 @@ def flat_map_depth(
 
 
 def for_each(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable[[Any], None]
-) -> Union[Dict[Any, Any], List[Any]]:
+    collection: dict[Any, Any] | list[Any], func: Callable[[Any], None]
+) -> dict[Any, Any] | list[Any]:
     """
     Iterates over elements of collection and invokes iteratee for each element.
     The iteratee is invoked with three arguments: (value, index|key, collection).
@@ -830,16 +840,16 @@ def for_each(
     """
     if isinstance(collection, dict):
         for v in collection.values():
-            func(v)  # noqa: E701
+            func(v)
     else:
         for v in collection:
-            func(v)  # noqa: E701
+            func(v)
     return collection
 
 
 def for_each_right(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable[[Any], None]
-) -> Union[Dict[Any, Any], List[Any]]:
+    collection: dict[Any, Any] | list[Any], func: Callable[[Any], None]
+) -> dict[Any, Any] | list[Any]:
     """
     Iterates over elements of a collection from right to left and invokes a function for each element.
     The function is invoked with one argument: the current element.
@@ -862,11 +872,11 @@ def for_each_right(
         list(collection.values()) if isinstance(collection, dict) else list(collection)
     )
     for v in reversed(items):
-        func(v)  # noqa: E701
+        func(v)
     return collection
 
 
-def includes(collection: Union[Dict[Any, Any], List[Any]], value: Any) -> bool:
+def includes(collection: dict[Any, Any] | list[Any], value: Any) -> bool:
     """
     Checks if a given value is present in a collection.
 
@@ -887,8 +897,8 @@ def includes(collection: Union[Dict[Any, Any], List[Any]], value: Any) -> bool:
 
 
 def invoke_map(
-    collection: List[Any], method: Union[str, Callable], *args, **kwargs
-) -> List[Any]:
+    collection: list[Any], method: str | Callable, *args, **kwargs
+) -> list[Any]:
     """
     Invokes the given iteratee function on each element of the given collection
     and returns an array of the results. The iteratee is invoked with the
@@ -911,7 +921,7 @@ def invoke_map(
         >>> invoke_map([1, 2, 3], lambda x: x * 2)
         [2, 4, 6]
     """
-    result: List[Any] = []
+    result: list[Any] = []
     for x in collection:
         if isinstance(method, str):
             fn = getattr(x, method)
@@ -922,8 +932,8 @@ def invoke_map(
 
 
 def key_by(
-    collection: List[Dict[Any, Any]], iteratee: Union[str, Callable]
-) -> Dict[Any, Dict[Any, Any]]:
+    collection: list[dict[Any, Any]], iteratee: str | Callable
+) -> dict[Any, dict[Any, Any]]:
     """
     Creates an object composed of keys generated from the results of running each element of the given collection
     through the given iteratee.
@@ -947,15 +957,15 @@ def key_by(
             return x.get(iteratee)
     else:
         fn = iteratee
-    out: Dict[Any, Any] = {}
+    out: dict[Any, Any] = {}
     for x in collection:
         out[fn(x)] = x
     return out
 
 
 def map_(
-    collection: Union[Dict[Any, Any], List[Any]], iteratee: Union[str, Callable]
-) -> List[Any]:
+    collection: dict[Any, Any] | list[Any], iteratee: str | Callable
+) -> list[Any]:
     """
     Creates a list of values by running each element of the given collection
     through the given iteratee.
@@ -984,7 +994,7 @@ def map_(
     return [fn(v) for v in items]
 
 
-def nest(collection: List[Dict[Any, Any]], keys: List[str]) -> Dict[Any, Any]:
+def nest(collection: list[dict[Any, Any]], keys: list[str]) -> dict[Any, Any]:
     """
     Groups a list of dictionaries into a nested dictionary based on the specified keys.
 
@@ -1017,7 +1027,7 @@ def nest(collection: List[Dict[Any, Any]], keys: List[str]) -> Dict[Any, Any]:
         }
     """
 
-    out: Dict[Any, Any] = {}
+    out: dict[Any, Any] = {}
     for x in collection:
         curr = out
         for i, k in enumerate(keys):
@@ -1030,10 +1040,10 @@ def nest(collection: List[Dict[Any, Any]], keys: List[str]) -> Dict[Any, Any]:
 
 
 def order_by(
-    collection: List[Dict[Any, Any]],
-    iteratees: List[Union[str, Callable]],
-    orders: Optional[List[str]] = None,
-) -> List[Dict[Any, Any]]:
+    collection: list[dict[Any, Any]],
+    iteratees: list[str | Callable],
+    orders: list[str] | None = None,
+) -> list[dict[Any, Any]]:
     """
     Orders a collection of dictionaries based on the specified iteratees and their corresponding orders.
 
@@ -1068,7 +1078,7 @@ def order_by(
 
 
 def reduce_(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable, initial: Any
+    collection: dict[Any, Any] | list[Any], func: Callable, initial: Any
 ) -> Any:
     """
     Reduces a collection to a single accumulated value by applying a function.
@@ -1094,7 +1104,7 @@ def reduce_(
 
 
 def reduce_right(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable, initial: Any
+    collection: dict[Any, Any] | list[Any], func: Callable, initial: Any
 ) -> Any:
     """
     Reduces a collection to a single accumulated value by applying a function from right to left.
@@ -1121,8 +1131,8 @@ def reduce_right(
 
 
 def reductions(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable, initial: Any
-) -> List[Any]:
+    collection: dict[Any, Any] | list[Any], func: Callable, initial: Any
+) -> list[Any]:
     """
     Applies a rolling computation to sequential pairs of values in an iterable.
 
@@ -1139,7 +1149,7 @@ def reductions(
         [1, 3, 6, 10]
     """
     acc = initial
-    result: List[Any] = []
+    result: list[Any] = []
     items = collection.values() if isinstance(collection, dict) else collection
     for v in items:
         acc = func(acc, v)
@@ -1148,8 +1158,8 @@ def reductions(
 
 
 def reductions_right(
-    collection: Union[Dict[Any, Any], List[Any]], func: Callable, initial: Any
-) -> List[Any]:
+    collection: dict[Any, Any] | list[Any], func: Callable, initial: Any
+) -> list[Any]:
     """
     Applies a rolling computation to sequential pairs of values in an iterable from right to left.
 
@@ -1166,7 +1176,7 @@ def reductions_right(
         [10, 9, 7, 4]
     """
     acc = initial
-    result: List[Any] = []
+    result: list[Any] = []
     items = (
         list(collection.values()) if isinstance(collection, dict) else list(collection)
     )
@@ -1177,8 +1187,8 @@ def reductions_right(
 
 
 def sample_size(
-    collection: Union[Dict[Any, Any], List[Any]], n: Optional[int] = None
-) -> List[Any]:
+    collection: dict[Any, Any] | list[Any], n: int | None = None
+) -> list[Any]:
     """
     Retrieves `n` random elements from a given `collection`.
 
@@ -1205,7 +1215,7 @@ def sample_size(
     n = min(n, length)
     return random.sample(items, n)
 
-def assign(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any, Any]:
+def assign(target: dict[Any, Any], *sources: dict[Any, Any]) -> dict[Any, Any]:
     """
     Assigns properties of source object(s) to the destination object.
 
@@ -1233,8 +1243,8 @@ def assign(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any, Any]:
     return target
 
 def map_keys(
-    obj: Dict[Any, Any], iteratee: Union[str, Callable[[Any], Any]]
-) -> Dict[Any, Any]:
+    obj: dict[Any, Any], iteratee: str | Callable[[Any], Any]
+) -> dict[Any, Any]:
     """
     Creates an object with the same values but keys generated by running each key through iteratee.
 
@@ -1258,15 +1268,15 @@ def map_keys(
             )
     else:
         fn = iteratee  # type: ignore
-    out: Dict[Any, Any] = {}
+    out: dict[Any, Any] = {}
     for k, v in obj.items():
         out[fn(k, v)] = v
     return out
 
 
 def map_values(
-    obj: Dict[Any, Any], iteratee: Union[str, Callable[[Any], Any]]
-) -> Dict[Any, Any]:
+    obj: dict[Any, Any], iteratee: str | Callable[[Any], Any]
+) -> dict[Any, Any]:
     """
     Creates a new dictionary with the same keys but values generated by running each value
     of the input dictionary through the given iteratee.
@@ -1295,7 +1305,7 @@ def map_values(
     return {k: fn(v) for k, v in obj.items()}
 
 
-def rename_keys(obj: Dict[Any, Any], key_map: Dict[Any, Any]) -> Dict[Any, Any]:
+def rename_keys(obj: dict[Any, Any], key_map: dict[Any, Any]) -> dict[Any, Any]:
     """
     Rename the keys of obj using key_map and return new object.
 
@@ -1336,7 +1346,7 @@ def to_integer(value: Any) -> int:
 
     try:
         return int(float(value))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 0
 
 def to_string(value: Any) -> str:
@@ -1359,7 +1369,7 @@ def to_string(value: Any) -> str:
     return "" if value is None else str(value)
 
 
-def to_list(value: Any) -> List[Any]:
+def to_list(value: Any) -> list[Any]:
     """
     Casts a value to a list: None -> [], tuples/sets -> list, others -> [value].
 
@@ -1411,11 +1421,11 @@ def to_dict(value):
         return value
     if isinstance(value, (list, tuple)):
         return {i: v for i, v in enumerate(value)}
-    if hasattr(value, "items") and callable(getattr(value, "items")):
-        return dict(value.items())
+    if hasattr(value, "items") and callable(value.items):
+        return dict(value.items()) # type: ignore
     try:
         return dict(value)  # best-effort
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
@@ -1444,7 +1454,7 @@ def keys(obj):
         return list(builtins.range(len(obj)))
     key_reader = getattr(obj, "keys", None)
     if callable(key_reader):
-        return list(key_reader())
+        return list(key_reader()) # type: ignore
     if hasattr(obj, "__dict__"):
         return list(_dict_keys(obj.__dict__))
     return []
@@ -1474,7 +1484,7 @@ def values(obj):
         return list(obj)
     value_reader = getattr(obj, "values", None)
     if callable(value_reader):
-        return list(value_reader())
+        return list(value_reader()) # type: ignore
     if hasattr(obj, "__dict__"):
         return list(_dict_values(obj.__dict__))
     return []
@@ -1567,13 +1577,13 @@ def invert_by(obj, iteratee=None):
         {"x1": [0], "x2": [1], "x3": [2]}
     """
     fn = iteratee or (lambda x: x)
-    out: Dict[Any, List[Any]] = {}
+    out: dict[Any, list[Any]] = {}
     for k, v in _iter_items_like(obj):
         key_val = fn(v)
         out.setdefault(key_val, []).append(k)
     return out
 
-def unset(obj, path, *, limits: Optional[PathLimits] = None) -> bool:
+def unset(obj, path, *, limits: PathLimits | None = None) -> bool:
     """
     Removes the property at `path` of `obj`.
 
@@ -1632,13 +1642,13 @@ def unset(obj, path, *, limits: Optional[PathLimits] = None) -> bool:
         try:
             delattr(cur, str(last))
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     return False
 
 
-def update(obj, path, updater, *, limits: Optional[PathLimits] = None):
+def update(obj, path, updater, *, limits: PathLimits | None = None):
     """
     Update value at `path` by applying `updater` (or using it as a constant).
 
@@ -1744,7 +1754,7 @@ def for_in_right(obj, iteratee):
     return obj
 
 
-def clone(obj: Union[Dict, List]) -> Union[Dict, List]:
+def clone(obj: dict | list) -> dict | list:
     """
     Creates a shallow copy of an object (dictionary or list).
 
@@ -1808,8 +1818,8 @@ def clone_deep_with(obj: Any, customizer: Callable) -> Any:
         >>> cloned
         {'a': 2, 'b': 3}
     """
-    memo: Dict[int, Any] = {}
-    stack: List[Tuple[Any, Any, Any, Any]] = [(obj, None, None, None)]
+    memo: dict[int, Any] = {}
+    stack: list[tuple[Any, Any, Any, Any]] = [(obj, None, None, None)]
     root: Any = None
 
     while stack:
@@ -1844,7 +1854,7 @@ def clone_deep_with(obj: Any, customizer: Callable) -> Any:
     return root
 
 
-def defaults_deep(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any, Any]:
+def defaults_deep(target: dict[Any, Any], *sources: dict[Any, Any]) -> dict[Any, Any]:
     """
     Assigns properties of source object(s) to the destination object for all destination properties
     that resolve to undefined. This method is like :func:`defaults` except that it recursively assigns
@@ -1872,7 +1882,7 @@ def defaults_deep(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any,
         if not isinstance(src, dict):
             continue
 
-        stack: List[Tuple[Any, Any, Any, Any]] = [(target, src, None, None)]
+        stack: list[tuple[Any, Any, Any, Any]] = [(target, src, None, None)]
         while stack:
             current, defaults_obj, parent, parent_key = stack.pop()
 
@@ -1883,9 +1893,7 @@ def defaults_deep(target: Dict[Any, Any], *sources: Dict[Any, Any]) -> Dict[Any,
                         continue
 
                     existing = current[key]
-                    if isinstance(existing, dict) and isinstance(value, dict):
-                        stack.append((existing, value, current, key))
-                    elif isinstance(existing, list) and isinstance(value, list):
+                    if isinstance(existing, dict) and isinstance(value, dict) or isinstance(existing, list) and isinstance(value, list):
                         stack.append((existing, value, current, key))
                     elif existing is None:
                         current[key] = clone_deep(value) if isinstance(value, (dict, list)) else value
@@ -1956,7 +1964,7 @@ def merge(*objects: Any) -> Any:
             if result is head:
                 result = clone_deep(result)
 
-            stack: List[Tuple[Dict[Any, Any], Dict[Any, Any]]] = [(result, o)]
+            stack: list[tuple[dict[Any, Any], dict[Any, Any]]] = [(result, o)]
             while stack:
                 target_obj, source_obj = stack.pop()
                 for k, v in source_obj.items():
@@ -1968,7 +1976,7 @@ def merge(*objects: Any) -> Any:
                     if isinstance(existing, dict) and isinstance(v, dict):
                         stack.append((existing, v))
                     elif isinstance(existing, list) and isinstance(v, list):
-                        merged_list: List[Any] = []
+                        merged_list: list[Any] = []
                         limit = max(len(existing), len(v))
                         for index in builtins.range(limit):
                             if (
@@ -2086,7 +2094,7 @@ def assign_with(target: dict, *sources, customizer=None) -> dict:
         if not isinstance(src, dict):
             try:
                 src = dict(src)
-            except Exception:
+            except Exception:  # noqa: BLE001, S112
                 continue
         for k, v in src.items():
             obj_val = target.get(k, None)
@@ -2159,8 +2167,8 @@ def map_values_deep(obj: Any, fn: Callable[..., Any]) -> Any:
             return fn(obj)
 
     root = {} if isinstance(obj, dict) else [None] * len(obj)
-    memo: Dict[int, Any] = {id(obj): root}
-    stack: List[Tuple[Any, Any, List[Union[str, int]]]] = [(obj, root, [])]
+    memo: dict[int, Any] = {id(obj): root}
+    stack: list[tuple[Any, Any, list[str | int]]] = [(obj, root, [])]
 
     while stack:
         current, mapped, path = stack.pop()
@@ -2217,7 +2225,7 @@ def apply(fn: Callable[..., U], *args: Any, **kwargs: Any) -> U:
     return real_fn(*a, **kw)
 
 
-def apply_if_not_none(fn: Callable[..., U], *args: Any, **kwargs: Any) -> Optional[U]:
+def apply_if_not_none(fn: Callable[..., U], *args: Any, **kwargs: Any) -> U | None:
     """
     Applies a function to some arguments if none of the arguments are None. Otherwise, return None.
 
@@ -2314,10 +2322,10 @@ def clone_with(obj: Any, customizer: Callable[..., Any]) -> Any:
 
 def get(
     obj: Any,
-    path: Union[str, Iterable[Any], Any],
+    path: str | Iterable[Any] | Any,
     default: Any = None,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ) -> Any:
     """
     Return the value at `path` from `obj`. If not set, returns `default`.
@@ -2446,7 +2454,7 @@ def merge_with(*objects, customizer=None):
     head, *rest = objects
     result = clone_deep(head) if isinstance(head, (dict, list)) else head
     for nxt in rest:
-        stack: List[Tuple[Any, Any, Any, Any]] = [(result, nxt, None, None)]
+        stack: list[tuple[Any, Any, Any, Any]] = [(result, nxt, None, None)]
         while stack:
             left, right, parent, key = stack.pop()
 
@@ -2476,7 +2484,7 @@ def merge_with(*objects, customizer=None):
                 continue
 
             if isinstance(left, list) and isinstance(right, list):
-                merged_list: List[Any] = []
+                merged_list: list[Any] = []
                 limit = max(len(left), len(right))
                 if parent is None:
                     result = merged_list
@@ -2511,7 +2519,7 @@ def merge_with(*objects, customizer=None):
                 parent[key] = replacement
     return result
 
-def parse_int(value: Any, radix: Optional[int] = None) -> Optional[int]:
+def parse_int(value: Any, radix: int | None = None) -> int | None:
     """
     Converts the given `value` into an integer of the specified `radix`. If `radix` is falsey, a
     radix of ``10`` is used unless the `value` is a hexadecimal, in which case a radix of 16 is
@@ -2539,7 +2547,7 @@ def parse_int(value: Any, radix: Optional[int] = None) -> Optional[int]:
     if radix is None and isinstance(value, (int, float)):
         try:
             return int(value)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     # Otherwise parse the *string* with the requested base
@@ -2547,11 +2555,11 @@ def parse_int(value: Any, radix: Optional[int] = None) -> Optional[int]:
     try:
         base = 16 if radix is None else (0 if radix == 0 else radix)
         return int(s, base)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     
 
-def pick(obj, *keys_to_pick, limits: Optional[PathLimits] = None):
+def pick(obj, *keys_to_pick, limits: PathLimits | None = None):
     """
     Creates an object composed of the picked `keys_to_pick` from `obj`.
 
@@ -2569,7 +2577,7 @@ def pick(obj, *keys_to_pick, limits: Optional[PathLimits] = None):
     """
     if not keys_to_pick:
         return {}
-    out: Dict[Any, Any] = {}
+    out: dict[Any, Any] = {}
     deep_paths, flat_keys = [], set()
 
     for p in _flatten_keys(keys_to_pick):
@@ -2620,11 +2628,11 @@ def pick_by(obj, predicate=None):
     return {k: v for k, v in _iter_items_like(obj) if predicate(v, k)}
 def to_boolean(
     value: Any,
-    true_patterns: Optional[Iterable[Union[str, UnsafeRegex]]] = None,
-    false_patterns: Optional[Iterable[Union[str, UnsafeRegex]]] = None,
+    true_patterns: Iterable[str | UnsafeRegex] | None = None,
+    false_patterns: Iterable[str | UnsafeRegex] | None = None,
     *,
-    limits: Optional[RegexLimits] = None,
-) -> Optional[bool]:
+    limits: RegexLimits | None = None,
+) -> bool | None:
     if isinstance(value, str):
         s = value.strip()
         if true_patterns:
@@ -2658,9 +2666,9 @@ def to_boolean(
     return bool(value)
 
 def transform(
-    obj: Union[Dict[Any, Any], List[Any]],
-    func: Optional[Callable[..., Any]] = None,
-    accumulator: Optional[Any] = None,
+    obj: dict[Any, Any] | list[Any],
+    func: Callable[..., Any] | None = None,
+    accumulator: Any | None = None,
 ) -> Any:
     """
     Transforms an object by applying a function to each item in the object.
@@ -2700,7 +2708,7 @@ def transform(
             break
     return accumulator
 
-def to_number(value: Any, precision: Optional[int] = 0) -> Optional[float]:
+def to_number(value: Any, precision: int | None = 0) -> float | None:
     """
     Convert `value` to a number. All numbers are retuned as ``float``. If precision is negative, round
     `value` to the nearest positive integer place. If `value` can't be converted to a number, ``None``
@@ -2723,7 +2731,7 @@ def to_number(value: Any, precision: Optional[int] = 0) -> Optional[float]:
     """
     try:
         num = float(value)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     if precision is None:
         return num
@@ -2737,7 +2745,7 @@ def set_(
     path,
     value,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ):
     """
     Set `value` at `path`, creating intermediate containers.
@@ -2764,15 +2772,7 @@ def set_(
     cur = obj
     for i, seg in enumerate(parts[:-1]):
         prefer_list = isinstance(parts[i + 1], int)
-        if isinstance(cur, dict):
-            cur, _ = _ensure_container(
-                cur,
-                seg,
-                None,
-                prefer_list_index=prefer_list,
-                max_list_length=resolved_limits.max_list_length,
-            )
-        elif isinstance(cur, list) and isinstance(seg, int):
+        if isinstance(cur, dict) or isinstance(cur, list) and isinstance(seg, int):
             cur, _ = _ensure_container(
                 cur,
                 seg,
@@ -2809,7 +2809,7 @@ def set_with(
     value,
     customizer,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ):
     """
     Set `value` at `path`, creating intermediate containers.
@@ -2887,7 +2887,7 @@ def update_with(
     func,
     customizer,
     *,
-    limits: Optional[PathLimits] = None,
+    limits: PathLimits | None = None,
 ):
     """
     Update value at `path` by applying `func` (or using it as a constant).

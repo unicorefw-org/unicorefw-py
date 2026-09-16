@@ -10,14 +10,15 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
 ##############################################################################
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
-from unicorefw import _, SecurityError
+from unicorefw import SecurityError, _
+
 
 class TestTemplateEdgeCases(unittest.TestCase):
     def test_template_invalid_tag(self):
@@ -44,7 +45,7 @@ class TestTemplateEdgeCases(unittest.TestCase):
         # Pattern suspicious for __class__ or __globals__, etc.
         template_str = "Danger <%= something.__class__.__dict__ %>"
         context = {"something": "test"}
-        with self.assertRaises(SecurityError):
+        with self.assertRaises(SecurityError): # type: ignore
             _.template(template_str, context)
 
 

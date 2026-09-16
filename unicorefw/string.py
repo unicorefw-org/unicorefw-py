@@ -15,18 +15,16 @@ the Free Software Foundation.
 You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
-from .supporter import (
-    _deburr_latin_only,
-    _parse_js_regex,
-    _to_str
-)
-from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
 import math
 import re
 import string as _st
 import textwrap
-from typing import Any, List, Optional, Union, Callable
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from .regex_policy import RegexLimits, UnsafeRegex, compile_bounded_regex
+from .supporter import _deburr_latin_only, _parse_js_regex, _to_str
 
 _str_join = str.join
 _str_split = str.split
@@ -88,7 +86,7 @@ def humanize(string: str) -> str:
     return text.capitalize()
 
 
-def slice(string: str, start: int = 0, end: Optional[int] = None) -> str:
+def slice(string: str, start: int = 0, end: int | None = None) -> str:
     """
     Return a substring of 'string' from index 'start' up to, but not including, 'end'.
     If 'end' is None, slices until the end of the string.
@@ -129,11 +127,11 @@ def replace_all(string: str, find: str, replacement: str) -> str:
 
 def regex_find_all(
     string: str,
-    pattern: Union[str, UnsafeRegex],
+    pattern: str | UnsafeRegex,
     flags: int = 0,
     *,
-    limits: Optional[RegexLimits] = None,
-) -> List[str]:
+    limits: RegexLimits | None = None,
+) -> list[str]:
     """
     Find all non-overlapping matches of a regex pattern in the given string.
 
@@ -155,10 +153,10 @@ def regex_find_all(
 
 def regex_test(
     string: str,
-    pattern: Union[str, UnsafeRegex],
+    pattern: str | UnsafeRegex,
     flags: int = 0,
     *,
-    limits: Optional[RegexLimits] = None,
+    limits: RegexLimits | None = None,
 ) -> bool:
     """
     Test if the string contains at least one match of the regex pattern.
@@ -181,11 +179,11 @@ def regex_test(
 
 def regex_replace(
     string: str,
-    pattern: Union[str, UnsafeRegex],
-    replacement: Union[str, Callable[[re.Match], str]],
+    pattern: str | UnsafeRegex,
+    replacement: str | Callable[[re.Match], str],
     flags: int = 0,
     *,
-    limits: Optional[RegexLimits] = None,
+    limits: RegexLimits | None = None,
 ) -> str:
     """
     Replace all matches of the given regex pattern in 'string' with 'replacement'.
@@ -214,12 +212,12 @@ def regex_replace(
 
 def regex_extract(
     string: str,
-    pattern: Union[str, UnsafeRegex],
+    pattern: str | UnsafeRegex,
     group: int = 0,
     flags: int = 0,
     *,
-    limits: Optional[RegexLimits] = None,
-) -> Optional[str]:
+    limits: RegexLimits | None = None,
+) -> str | None:
     """
     Find the first match of 'pattern' in 'string' and return the specified capture group.
 
@@ -243,12 +241,12 @@ def regex_extract(
 
 def regex_extract_all(
     string: str,
-    pattern: Union[str, UnsafeRegex],
+    pattern: str | UnsafeRegex,
     group: int = 0,
     flags: int = 0,
     *,
-    limits: Optional[RegexLimits] = None,
-) -> List[str]:
+    limits: RegexLimits | None = None,
+) -> list[str]:
     """
     Find all non-overlapping matches of 'pattern' in 'string' and return the specified capture group.
 
@@ -271,7 +269,12 @@ def regex_extract_all(
 
 def strip_html_tags(string: str) -> str:
     """
-    Remove all HTML tags from a string.
+    Remove tag-shaped ``<...>`` text from a string.
+
+    This is a display-text transformation, not an HTML sanitizer. It does not
+    remove script contents, decode entities, or make untrusted input safe for
+    HTML output. Escape untrusted text with ``html.escape`` or use a maintained
+    allow-list sanitizer appropriate to the output context.
 
     Args:
         string: The string to process.
@@ -283,9 +286,8 @@ def strip_html_tags(string: str) -> str:
         >>> strip_html_tags("<h1>Hello, world!</h1>")
         "Hello, world!"
     """
-    # This pattern finds anything of the form <...>
-    # Note: This is a simplistic approach; for complex HTML parsing,
-    #       consider a dedicated HTML parser.
+    # Preserve the historical text transformation; callers needing a security
+    # boundary must use contextual escaping or a dedicated sanitizer.
     return re.sub(r"<[^>]*>", "", string)
 
 def mask_sensitive(string: str, pattern: str, mask_char: str = "*") -> str:
@@ -475,7 +477,7 @@ def upper_first(s: Any) -> str:
     """
     return capitalize(s)
 
-def chop(s: Any, size: int) -> List[str]:
+def chop(s: Any, size: int) -> list[str]:
     """
     Split the string into chunks of length `size`, starting from the front.
     The last chunk may be shorter if the string length isn’t a multiple of `size`.
@@ -500,12 +502,12 @@ def chop(s: Any, size: int) -> List[str]:
     text = _to_str(s)
     if not text or size <= 0:
         return [] if not text else [text]
-    result: List[str] = []
+    result: list[str] = []
     for i in range(0, len(text), size):
         result.append(text[i : i + size])
     return result
 
-def chop_right(s: Any, size: int) -> List[str]:
+def chop_right(s: Any, size: int) -> list[str]:
     """
     Split the string into chunks of length `size`, starting from the right.
     The first chunk may be shorter if the string length isn’t a multiple of `size`.
@@ -531,7 +533,7 @@ def chop_right(s: Any, size: int) -> List[str]:
         return [] if not text else [text]
     n = len(text)
     rem = n % size
-    chunks: List[str] = []
+    chunks: list[str] = []
     # first chunk handles the remainder
     start = 0
     if rem:
@@ -563,7 +565,7 @@ def clean(s: Any) -> str:
     # collapse any run of whitespace into a single space, then trim
     return re.sub(r"\s+", " ", text).strip()
 
-def chars(s: Any) -> List[str]:
+def chars(s: Any) -> list[str]:
     """
     Return a list of the individual characters in the string.
 
@@ -685,7 +687,10 @@ def substr_right_end(s: Any, sep: Any) -> str:
 
 def strip_tags(s: Any) -> str:
     """
-    Remove all HTML tags from the string.
+    Remove tag-shaped ``<...>`` text from the string.
+
+    This compatibility helper is not an HTML sanitizer. Escape untrusted text
+    for its output context or use a maintained allow-list sanitizer.
 
     Args:
         s: The string (or value) to clean.
@@ -866,11 +871,11 @@ def has_substr(s: Any, substr: Any, pos: int = 0) -> bool:
         return True
     try:
         return text.find(needle, pos) != -1
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 def pad(
-    string: Optional[str],
+    string: str | None,
     length: int,
     chars: str = " "
 ) -> str:
@@ -911,7 +916,7 @@ def pad(
     return build(left) + s + build(right)
 
 def pad_start(
-    string: Optional[str],
+    string: str | None,
     length: int,
     chars: str = " "
 ) -> str:
@@ -942,7 +947,7 @@ def pad_start(
     return big[-pad_count:] + s
 
 def pad_end(
-    string: Optional[str],
+    string: str | None,
     length: int,
     chars: str = " "
 ) -> str:
@@ -972,7 +977,7 @@ def pad_end(
 
 def quote(
     value: Any,
-    wrapper: Optional[Any] = '"'
+    wrapper: Any | None = '"'
 ) -> str:
     """
     Wrap `value` (converted to string) with `wrapper` on both sides.
@@ -1064,7 +1069,7 @@ def count_substr(s: Any, substr: Any) -> int:
     return text.count(sub)
 def replace(
     string: Any,
-    pattern: Optional[Union[str, re.Pattern]],
+    pattern: str | re.Pattern | None,
     replacement: Any,
     ignore_case: bool = False,
     count: int = 0
@@ -1283,7 +1288,7 @@ def ensure_ends_with(string: Any, suffix: Any) -> str:
     return s if (not suf or s.endswith(suf)) else s + suf
 
 
-def trim_start(string: Any, chars: Optional[str] = None) -> str:
+def trim_start(string: Any, chars: str | None = None) -> str:
     """
     Trim whitespace or specified characters from the start of the string.
 
@@ -1302,7 +1307,7 @@ def trim_start(string: Any, chars: Optional[str] = None) -> str:
     return s.lstrip() if chars is None else s.lstrip(chars)
 
 
-def trim_end(string: Any, chars: Optional[str] = None) -> str:
+def trim_end(string: Any, chars: str | None = None) -> str:
     """
     Trim whitespace or specified characters from the end of the string.
 
@@ -1321,7 +1326,7 @@ def trim_end(string: Any, chars: Optional[str] = None) -> str:
     return s.rstrip() if chars is None else s.rstrip(chars)
 
 
-def trim(string: Any, chars: Optional[str] = None) -> str:
+def trim(string: Any, chars: str | None = None) -> str:
     """
     Trim whitespace or specified characters from both ends of the string.
 
@@ -1361,14 +1366,12 @@ def insert_substr(string: Any, index: int, substring: Any) -> str:
         idx = int(index)
     except (TypeError, ValueError):
         idx = 0
-    if idx < 0:
-        idx = 0
-    if idx > len(s):
-        idx = len(s)
+    idx = max(idx, 0)
+    idx = min(idx, len(s))
     return s[:idx] + sub + s[idx:]
 
 
-def unquote(string: Any, quote_char: Optional[str] = None) -> str:
+def unquote(string: Any, quote_char: str | None = None) -> str:
     """
     Remove matching surrounding quotes from a string.
 
@@ -1396,7 +1399,7 @@ def unquote(string: Any, quote_char: Optional[str] = None) -> str:
     return s
 
 
-def reg_exp_js_match(text: Any, js_literal: Any) -> List[str]:
+def reg_exp_js_match(text: Any, js_literal: Any) -> list[str]:
     """
     Match JS-style regex literal against text, returning list of matches.
     Non-global returns at most one; global returns all.
@@ -1444,7 +1447,7 @@ def reg_exp_js_replace(
     count = 0 if is_global else 1
     return regex.sub(rep, s, count)
 
-def starts_with(string: Any, prefix: Any, position: Optional[int] = 0) -> bool:
+def starts_with(string: Any, prefix: Any, position: int | None = 0) -> bool:
     """
     Check if `string` starts with `prefix` at `position`.
 
@@ -1483,7 +1486,7 @@ def starts_with(string: Any, prefix: Any, position: Optional[int] = 0) -> bool:
     pos = max(0, min(pos, len(s)))
     return s.startswith(p, pos)
 
-def ends_with(string: Any, suffix: Any, position: Optional[int] = None) -> bool:
+def ends_with(string: Any, suffix: Any, position: int | None = None) -> bool:
     """
     Check if `string` ends with `suffix` at `position`.
 
@@ -1591,7 +1594,7 @@ def deburr(string: Any) -> str:
     # Direct map for U+00C0–U+00FF
     return "".join(_DEBURR_MAP.get(ch, ch) for ch in s)
 
-def lines(string: Optional[str]) -> List[str]:
+def lines(string: str | None) -> list[str]:
     """
     Split a string into lines, handling Unix (\\n), Windows (\\r\\n) and old Mac (\\r) breaks.
 
@@ -1631,11 +1634,11 @@ def lines(string: Optional[str]) -> List[str]:
 
 
 def words(
-    string: Optional[str],
-    pattern: Optional[Union[str, UnsafeRegex]] = None,
+    string: str | None,
+    pattern: str | UnsafeRegex | None = None,
     *,
-    limits: Optional[RegexLimits] = None,
-) -> List[str]:
+    limits: RegexLimits | None = None,
+) -> list[str]:
     """
     Extract “words” (letter‐runs and number‐runs) from a string, including camelCase splits.
 
@@ -1731,7 +1734,7 @@ def series_phrase(
 
 def prune(
     string: Any,
-    length: Optional[int] = None,
+    length: int | None = None,
     omission: str = "..."
 ) -> str:
     """
@@ -1931,9 +1934,9 @@ def upper_case(value: Any) -> str:
 
 def truncate(
     string: Any,
-    length: Optional[int] = None,
+    length: int | None = None,
     omission: str = "...",
-    separator: Union[str, re.Pattern, None] = None
+    separator: str | re.Pattern | None = None
 ) -> str:
     """
     Truncate `string` to a maximum length and append an omission marker if truncated.
@@ -2033,7 +2036,7 @@ def reg_exp_replace(
     pattern: Any,
     replacement: Any,
     ignore_case: bool = False,
-    count: Optional[int] = None
+    count: int | None = None
 ) -> str:
     """
     Replace occurrences of regex `pattern` with `replacement` in `text`. Optionally, ignore case
@@ -2267,7 +2270,7 @@ def number_format(
 
 
 
-def split(*args) -> List[str]:
+def split(*args) -> list[str]:
     """
     Split a string into parts.
 

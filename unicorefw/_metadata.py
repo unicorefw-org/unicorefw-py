@@ -6,7 +6,7 @@ metadata without importing optional runtime integrations.
 
 PACKAGE_NAME = "unicorefw"
 PACKAGE_DISPLAY_NAME = "UniCoreFW"
-VERSION = "1.1.5"
+VERSION = "1.2.0"
 AUTHOR = "Kenny Ngo"
 AUTHOR_EMAIL = "kenny@unicorefw.org"
 DESCRIPTION = "Universal Core Utility Library"

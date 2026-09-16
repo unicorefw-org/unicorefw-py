@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Pattern, Union
+from re import Pattern
 
 from .security import (
     InputValidationError,
@@ -66,7 +66,7 @@ class UnsafeRegex:
 
     __slots__ = ("_pattern",)
 
-    def __init__(self, pattern: Union[str, Pattern[str]]):
+    def __init__(self, pattern: str | Pattern[str]):
         if not isinstance(pattern, (str, re.Pattern)):
             raise InputValidationError(
                 "unsafe regex must be text or a compiled pattern"
@@ -74,19 +74,19 @@ class UnsafeRegex:
         self._pattern = pattern
 
     @property
-    def pattern(self) -> Union[str, Pattern[str]]:
+    def pattern(self) -> str | Pattern[str]:
         return self._pattern
 
     def __repr__(self) -> str:
         return "UnsafeRegex(<trusted pattern>)"
 
 
-def unsafe_raw_regex(pattern: Union[str, Pattern[str]]) -> UnsafeRegex:
+def unsafe_raw_regex(pattern: str | Pattern[str]) -> UnsafeRegex:
     """Mark one reviewed complex pattern as trusted."""
     return UnsafeRegex(pattern)
 
 
-def _resolve_regex_limits(limits: Optional[RegexLimits]) -> RegexLimits:
+def _resolve_regex_limits(limits: RegexLimits | None) -> RegexLimits:
     if limits is None:
         return _DEFAULT_REGEX_LIMITS
     if not isinstance(limits, RegexLimits):
@@ -248,11 +248,11 @@ def _validate_pattern_structure(pattern: str, limits: RegexLimits) -> None:
 
 
 def compile_bounded_regex(
-    pattern: Union[str, Pattern[str], UnsafeRegex],
+    pattern: str | Pattern[str] | UnsafeRegex,
     text: str,
     *,
     flags: int = 0,
-    limits: Optional[RegexLimits] = None,
+    limits: RegexLimits | None = None,
 ) -> Pattern[str]:
     """Validate workload budgets and compile one pattern under the safe policy."""
     resolved_limits = _resolve_regex_limits(limits)

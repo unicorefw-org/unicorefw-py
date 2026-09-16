@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, ".."))
 from unicorefw import _
 
 # Example usage:
-result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value()
+result = _([1, 2, 3, 4, 5]).map(lambda x: x * 2).filter(lambda x: x > 5).value() # type: ignore
 print(result)  # Expected output: [6, 8, 10]
 
 # Using a static function call
@@ -33,7 +33,7 @@ print(result)  # Expected output: "Name: Alice, Age: 25"
 
 # Example chain: reverse -> slice -> value
 result = (
-    _("Hello world")
+    _("Hello world") # type: ignore
     .kebab_case()
     .reverse()
 )

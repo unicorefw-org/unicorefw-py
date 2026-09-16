@@ -10,15 +10,21 @@
 # along with UniCoreFW. If not, see https://www.gnu.org/licenses/.           #
 ##############################################################################
 
-import unittest
-import sys
 import os
+import sys
+import unittest
+from importlib import import_module
+from unittest.mock import patch
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
 
 from unicorefw import _
+from unicorefw.function import reduce_ as reduce_impl
+from unicorefw.security import ResourceLimitError
+
+function_impl = import_module("unicorefw.function")
 
 class TestUniCoreFWFunctions(unittest.TestCase):
     def test_matches(self):
@@ -165,7 +171,128 @@ class TestUniCoreFWFunctions(unittest.TestCase):
         func = _.once(lambda: "called")
         result = func()
         self.assertEqual(result, "called")
-        # self.assertIsNone(func())
+        self.assertIsNone(func())
+
+    def test_function_fallback_and_validation_branches(self):
+        self.assertEqual(function_impl.invoke(["abc", object()], "upper"), ["ABC", None])
+        self.assertTrue(function_impl.iteratee({"a": 1})({"a": 1, "b": 2}))
+        self.assertTrue(function_impl.iteratee(2)(2))
+        self.assertEqual(function_impl.flow()(5), 5)
+        self.assertEqual(function_impl.flow_right()(5), 5)
+        self.assertEqual(function_impl.flip(lambda a, b: a - b)(2, 5), 3)
+        with self.assertRaises(TypeError):
+            function_impl.flip(None)
+
+        class Plain:
+            def existing(self):
+                return 1
+
+        instance = Plain()
+        self.assertIsNone(function_impl.bind_all(instance, "existing", "missing"))
+
+    def test_enhanced_debounce_cancels_max_timer_when_regular_schedule_fails(self):
+        class FakeTimer:
+            def __init__(self):
+                self.cancelled = False
+
+            def cancel(self):
+                self.cancelled = True
+
+        timer = FakeTimer()
+        calls = [0]
+
+        def schedule(self, delay, callback):
+            calls[0] += 1
+            if calls[0] == 1:
+                return timer
+            raise RuntimeError("schedule failed")
+
+        with patch.object(function_impl._TimerBudget, "schedule", schedule):
+            debounced = function_impl.enhanced_debounce(lambda value: value, 1, max_wait=2)
+            with self.assertRaises(RuntimeError):
+                debounced("value")
+        self.assertTrue(timer.cancelled)
+
+    def test_enhanced_debounce_execute_cancels_both_timers(self):
+        callbacks = []
+
+        class FakeTimer:
+            def __init__(self):
+                self.cancelled = False
+
+            def cancel(self):
+                self.cancelled = True
+
+        timers = []
+
+        def schedule(self, delay, callback):
+            timer = FakeTimer()
+            timers.append(timer)
+            callbacks.append(callback)
+            return timer
+
+        with patch.object(function_impl._TimerBudget, "schedule", schedule):
+            debounced = function_impl.enhanced_debounce(lambda value: value, 1, max_wait=2)
+            self.assertEqual(debounced("value"), "value")
+            callbacks[-1]()
+        self.assertTrue(all(timer.cancelled for timer in timers))
+
+    def test_enhanced_debounce_zero_delay_and_cancel(self):
+        import threading
+
+        called = threading.Event()
+        values = []
+
+        def record(value):
+            values.append(value)
+            called.set()
+            return value
+
+        debounced = function_impl.enhanced_debounce(record, 0, max_wait=1_000)
+        self.assertEqual(debounced("first"), "first")
+        self.assertTrue(called.wait(timeout=2))
+        debounced.cancel()
+        import time
+
+        deadline = time.monotonic() + 2.5
+        while debounced.pending_timer_count() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(debounced.pending_timer_count(), 0)
+
+        with self.assertRaises(TypeError):
+            function_impl.enhanced_debounce(None, 0)
+
+    def test_debounce_wrapper_and_direct_map_filter_helpers(self):
+        wrapped = function_impl.debounce_(lambda value: value + 1, 0)
+        self.assertEqual(wrapped(1), 2)
+        wrapped.cancel()
+        wrapped_with_max = function_impl.debounce_(lambda value: value * 2, 0, max_wait=1_000)
+        self.assertEqual(wrapped_with_max(2), 4)
+        wrapped_with_max.cancel()
+        self.assertEqual(function_impl.map_([1, 2], lambda value: value + 1), [2, 3])
+        self.assertEqual(function_impl.filter_([1, 2, 3], lambda value: value > 1), [2, 3])
+
+    def test_enhanced_debounce_replaces_timers_and_handles_budget_failure(self):
+        debounced = function_impl.enhanced_debounce(lambda value: value, 1_000, max_wait=2_000)
+        self.assertEqual(debounced("first"), "first")
+        self.assertEqual(debounced("second"), "first")
+        debounced.cancel()
+        import time
+
+        deadline = time.monotonic() + 2.5
+        while debounced.pending_timer_count() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(debounced.pending_timer_count(), 0)
+
+        limited = function_impl.enhanced_debounce(
+            lambda value: value,
+            1_000,
+            max_wait=2_000,
+            max_pending_timers=1,
+        )
+        with self.assertRaises(ResourceLimitError):
+            limited("value")
+        limited.cancel()
 
     def test_partial(self):
         def multiply(x, y):
@@ -199,6 +326,32 @@ class TestUniCoreFWFunctions(unittest.TestCase):
 
         wrapped_greet = _.wrap(greet, lambda f, name: f(name).upper())
         self.assertEqual(wrapped_greet("world"), "HELLO, WORLD!")
+
+    def test_argument_and_collection_helpers(self):
+        transformed = _.over_args(lambda a, b, c: (a, b, c), [lambda x: x + 1, str])
+        self.assertEqual(transformed(1, 2, 3), (2, "2", 3))
+
+        spread = _.spread(lambda a, b: a + b)
+        self.assertEqual(spread([2, 3]), 5)
+        self.assertEqual(_.unary(lambda value, extra=0: value + extra)(4, 9), 4)
+
+        self.assertEqual(_.map_([1, 2], lambda value: value * 2), [2, 4])
+        self.assertEqual(_.filter_([1, 2, 3], lambda value: value % 2), [1, 3])
+        self.assertEqual(reduce_impl([1, 2, 3], lambda left, right: left + right), 6)
+        self.assertEqual(reduce_impl([1, 2], lambda left, right: left * right, 3), 6)
+        with self.assertRaises(TypeError):
+            reduce_impl([], lambda left, right: left + right)
+
+    def test_predicate_combinators_and_argument_order(self):
+        self.assertTrue(_.allany(lambda value: value > 0)([1, 2, 3]))
+        self.assertFalse(_.allany(lambda value: value % 2 == 0)([2, 3]))
+        self.assertTrue(_.anyof(lambda value: value < 0, lambda value: value == 2)(2))
+        self.assertFalse(_.anyof(lambda value: value < 0)(2))
+
+        with self.assertRaises(TypeError):
+            _.after("bad", 2)
+        with self.assertRaises(TypeError):
+            _.before("bad", 2)
 
 
 if __name__ == "__main__":

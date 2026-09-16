@@ -17,51 +17,115 @@ along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 from __future__ import annotations
 
 import functools
-import inspect
-from typing import Any, Callable, Dict, Tuple
+import importlib
+from collections.abc import Callable
+from typing import Any
 
-# Import function categories
-from . import array
-from . import object as object_module
-from . import string
-from . import crypto
-from . import function
-from . import utils
-from . import types
-from . import security
-from . import template
-from . import db
-from . import orm
-from ._metadata import (
-    AUTHOR,
-    AUTHOR_EMAIL,
-    DESCRIPTION,
-    PACKAGE_DISPLAY_NAME,
-    VERSION,
+from ._core_registry import (
+    COMPATIBILITY_ALIASES,
+    CORE_EXPORTS_BY_MODULE,
+    LAZY_CHAIN_EXPORTS,
+    LAZY_STATIC_EXPORTS,
 )
+from ._metadata import AUTHOR, AUTHOR_EMAIL, DESCRIPTION, PACKAGE_DISPLAY_NAME, VERSION
+
+array = importlib.import_module(".array", __package__)
+object_module = importlib.import_module(".object", __package__)
+string = importlib.import_module(".string", __package__)
+function = importlib.import_module(".function", __package__)
+utils = importlib.import_module(".utils", __package__)
+types = importlib.import_module(".types", __package__)
+security = importlib.import_module(".security", __package__)
+template = importlib.import_module(".template", __package__)
 
 
-_MODULES_IN_ORDER = [
-    array,
-    object_module,
-    string,
-    crypto,
-    function,
-    utils,
-    types,
-    security,
-    template,
-    db,
-    orm
-]
+_CORE_MODULES = {
+    "array": array,
+    "object": object_module,
+    "string": string,
+    "function": function,
+    "utils": utils,
+    "types": types,
+    "security": security,
+    "template": template,
+}
 
 # Note: UniCoreFWWrapper intentionally wraps strings as chainable values as well.
-_CHAINABLE_RESULT_TYPES: Tuple[type, ...] = (str, dict, list, tuple, set)
+_CHAINABLE_RESULT_TYPES: tuple[type, ...] = (str, dict, list, tuple, set)
 
-# Registry of exported UniCoreFW functions. First match wins according to _MODULES_IN_ORDER.
-# Built once at import time for O(1) runtime dispatch.
-_FUNCTION_REGISTRY: Dict[str, Callable[..., Any]] = {}
+# Registry of declared chain functions, built once for O(1) name dispatch.
+_FUNCTION_REGISTRY: dict[str, Callable[..., Any]] = {}
 _object_getattribute = object.__getattribute__
+
+
+def _load_declared_function(
+    module_name: str,
+    function_name: str,
+) -> Callable[..., Any]:
+    try:
+        module = _CORE_MODULES[module_name]
+    except KeyError as exc:
+        raise RuntimeError(
+            f"configured core module {module_name} is unavailable"
+        ) from exc
+    try:
+        function = getattr(module, function_name)
+    except AttributeError as exc:
+        raise RuntimeError(
+            f"configured core export {module_name}.{function_name} is unavailable"
+        ) from exc
+    if not callable(function):
+        raise RuntimeError(  # noqa: TRY004
+            f"configured core export {module_name}.{function_name} is not callable"
+        )
+    return function
+
+
+def _load_public_function(module_name: str, function_name: str) -> Callable[..., Any]:
+    module = importlib.import_module(f".{module_name}", __package__)
+    function = getattr(module, function_name)
+    if not callable(function):
+        raise RuntimeError(  # noqa: TRY004
+            f"configured lazy export {module_name}.{function_name} is not callable"
+        )
+    return function
+
+
+def _create_lazy_static_method(
+    module_name: str,
+    function_name: str,
+) -> Callable[..., Any]:
+    def lazy_method(*args: Any, **kwargs: Any) -> Any:
+        function = _load_public_function(module_name, function_name)
+        setattr(UniCoreFW, function_name, staticmethod(function))
+        return function(*args, **kwargs)
+
+    lazy_method.__name__ = function_name
+    lazy_method.__qualname__ = f"UniCoreFW.{function_name}"
+    lazy_method.__doc__ = (
+        f"Lazy compatibility proxy for ``unicorefw.{module_name}." f"{function_name}``."
+    )
+    return lazy_method
+
+
+def _create_lazy_wrapper_method(
+    module_name: str,
+    function_name: str,
+) -> Callable[..., Any]:
+    def lazy_wrapper(
+        self: UniCoreFWWrapper,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        function = _load_public_function(module_name, function_name)
+        return self._apply_callable(function, *args, **kwargs)
+
+    lazy_wrapper.__name__ = function_name
+    lazy_wrapper.__qualname__ = f"UniCoreFWWrapper.{function_name}"
+    lazy_wrapper.__doc__ = (
+        f"Lazy chain proxy for ``unicorefw.{module_name}.{function_name}``."
+    )
+    return lazy_wrapper
 
 
 class UniCoreFW:
@@ -104,11 +168,11 @@ class UniCoreFW:
         except AttributeError:
             return _object_getattribute(self, item)
 
-    def __call__(self, collection: Any) -> "UniCoreFWWrapper":
+    def __call__(self, collection: Any) -> UniCoreFWWrapper:
         return UniCoreFWWrapper(collection)
 
     @classmethod
-    def _(cls, collection: Any) -> "UniCoreFW":
+    def _(cls, collection: Any) -> UniCoreFW:
         return cls(collection)
 
     @staticmethod
@@ -118,9 +182,11 @@ class UniCoreFW:
 
         This avoids per-call module scanning by binding the target callable at import time.
         """
+
         @functools.wraps(func)
-        def wrapper_method(self: "UniCoreFWWrapper", *args: Any, **kwargs: Any) -> Any:
-            return self._apply_callable(func, *args, **kwargs)
+        def wrapper_method(self: UniCoreFWWrapper, *args: Any, **kwargs: Any) -> Any:
+            result = func(self.collection, *args, **kwargs)
+            return self._wrap_result(result)
 
         return wrapper_method
 
@@ -157,10 +223,14 @@ class UniCoreFWWrapper:
             return UniCoreFWWrapper(result)
         return result
 
-    def _apply_callable(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    def _apply_callable(
+        self, func: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
         return self._wrap_result(func(self.collection, *args, **kwargs))
 
-    def _apply_unicore_function(self, function_name: str, *args: Any, **kwargs: Any) -> Any:
+    def _apply_unicore_function(
+        self, function_name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         """
         Apply a UniCoreFW function (by name) to the wrapped collection.
 
@@ -183,50 +253,97 @@ class UniCoreFWWrapper:
         """Return the underlying wrapped value."""
         return self.collection
 
-    def chain(self) -> "UniCoreFWWrapper":
+    def chain(self) -> UniCoreFWWrapper:
         """Return self to support fluent chaining."""
         return self
-    
+
 
 def _build_function_registry() -> None:
     """
-    Populate _FUNCTION_REGISTRY and attach module functions onto UniCoreFW and UniCoreFWWrapper.
+    Attach declared static functions and chainable wrapper methods.
 
-    - First module in _MODULES_IN_ORDER wins on name collisions.
+    - Generated ownership preserves historical name-collision behavior.
     - Wrapper methods do NOT overwrite core UniCoreFWWrapper methods like `value` and `chain`.
     - Functions are bound directly into wrapper methods for fast runtime dispatch.
     """
-    for module in _MODULES_IN_ORDER:
-        for name, func in inspect.getmembers(module, inspect.isfunction):
-            if name.startswith("_"):
+    for (
+        module_name,
+        packed_function_names,
+        packed_static_only_names,
+    ) in CORE_EXPORTS_BY_MODULE:
+        static_only_names = frozenset(packed_static_only_names.split())
+        for function_name in packed_function_names.split():
+            declared_function = _load_declared_function(
+                module_name,
+                function_name,
+            )
+            if not hasattr(UniCoreFW, function_name):
+                setattr(
+                    UniCoreFW,
+                    function_name,
+                    staticmethod(declared_function),
+                )
+            if function_name in static_only_names:
                 continue
+            if function_name not in _FUNCTION_REGISTRY:
+                _FUNCTION_REGISTRY[function_name] = declared_function
+            if not hasattr(UniCoreFWWrapper, function_name):
+                setattr(
+                    UniCoreFWWrapper,
+                    function_name,
+                    UniCoreFW._create_wrapper_method(declared_function),
+                )
 
-            # Avoid accidentally exporting imported/re-exported functions from other modules.
-            if getattr(func, "__module__", None) != module.__name__:
-                continue
+    for (
+        public_name,
+        module_name,
+        target_name,
+        chainable,
+    ) in COMPATIBILITY_ALIASES:
+        declared_function = _load_declared_function(module_name, target_name)
+        if not hasattr(UniCoreFW, public_name):
+            setattr(
+                UniCoreFW,
+                public_name,
+                staticmethod(declared_function),
+            )
+        if chainable and not hasattr(UniCoreFWWrapper, public_name):
+            setattr(
+                UniCoreFWWrapper,
+                public_name,
+                UniCoreFW._create_wrapper_method(declared_function),
+            )
 
-            if name in _FUNCTION_REGISTRY:
-                continue
+    for module_name, packed_function_names in LAZY_CHAIN_EXPORTS:
+        for function_name in packed_function_names.split():
+            static_proxy = _FUNCTION_REGISTRY.get(function_name)
+            if static_proxy is None:
+                static_proxy = _create_lazy_static_method(
+                    module_name,
+                    function_name,
+                )
+                _FUNCTION_REGISTRY[function_name] = static_proxy
+            if not hasattr(UniCoreFW, function_name):
+                setattr(UniCoreFW, function_name, staticmethod(static_proxy))
+            if not hasattr(UniCoreFWWrapper, function_name):
+                setattr(
+                    UniCoreFWWrapper,
+                    function_name,
+                    _create_lazy_wrapper_method(module_name, function_name),
+                )
 
-            _FUNCTION_REGISTRY[name] = func
-
-            # Attach chainable wrapper method (without overriding existing wrapper API)
-            if not hasattr(UniCoreFWWrapper, name):
-                setattr(UniCoreFWWrapper, name, UniCoreFW._create_wrapper_method(func))
-
-            # Attach static utility method (without overriding existing UniCoreFW API)
-            if not hasattr(UniCoreFW, name):
-                setattr(UniCoreFW, name, staticmethod(func))
-
-    # Resolve conflicts between Python builtins and UniCoreFW's max_value/min_value:
-    setattr(UniCoreFW, "max", staticmethod(utils.max_value))
-    setattr(UniCoreFW, "min", staticmethod(utils.min_value))
-
-    # Optional (non-breaking): add wrapper aliases for fluent chaining.
-    if not hasattr(UniCoreFWWrapper, "max"):
-        setattr(UniCoreFWWrapper, "max", UniCoreFW._create_wrapper_method(utils.max_value))
-    if not hasattr(UniCoreFWWrapper, "min"):
-        setattr(UniCoreFWWrapper, "min", UniCoreFW._create_wrapper_method(utils.min_value))
+    # Database and ORM helper functions stay available as static compatibility
+    # calls but are intentionally not registered as collection chain methods.
+    for module_name, packed_function_names in LAZY_STATIC_EXPORTS:
+        for function_name in packed_function_names.split():
+            if not hasattr(UniCoreFW, function_name):
+                setattr(
+                    UniCoreFW,
+                    function_name,
+                    staticmethod(
+                        _create_lazy_static_method(module_name, function_name)
+                    ),
+                )
 
 
 _build_function_registry()

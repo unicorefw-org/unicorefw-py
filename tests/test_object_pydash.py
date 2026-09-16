@@ -1,16 +1,16 @@
+import datetime as dt
+import os
+import sys
 from argparse import Namespace
 from collections import defaultdict, namedtuple
-import datetime as dt
 
 #import unittest
 import pytest
-import sys
-import os
-import math
-
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
+
 from unicorefw import _
 
 
@@ -37,11 +37,9 @@ class IteritemsObject:
 
     def iteritems(self):
         if isinstance(self._items, dict):
-            for key, value in self._items.items():
-                yield key, value
+            yield from self._items.items()
         else:
-            for i, item in enumerate(self._items):
-                yield i, item
+            yield from enumerate(self._items)
 
 
 class Filter:
@@ -107,7 +105,7 @@ def for_in_iteratee2(value, index, obj):
 
 parametrize = pytest.mark.parametrize
 
-today = dt.date.today()
+today = dt.date.today()  # noqa: DTZ011
 
 SomeNamedTuple = namedtuple("SomeNamedTuple", ["a", "b"])
 
@@ -928,8 +926,8 @@ def test_set_on_class_works_the_same_with_string_and_list():
 @parametrize(
     "case,expected",
     [
-        (({}, "[0][1]", "a", lambda: {}), {0: {1: "a"}}),
-        (({}, "[0][1]", dict, lambda: {}), {0: {1: dict}}),
+        (({}, "[0][1]", "a", lambda: {}), {0: {1: "a"}}),  # noqa: PIE807
+        (({}, "[0][1]", dict, lambda: {}), {0: {1: dict}}),  # noqa: PIE807
         ((Namespace(), "a.b", 5, lambda: Namespace()), Namespace(a=Namespace(b=5))),
         (
             (Namespace(a=Namespace(b=5)), "a.c.d", 55, lambda: Namespace()),

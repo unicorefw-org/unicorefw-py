@@ -1,8 +1,9 @@
+import os
 import re
 import sys
-import os
-import pytest
 from urllib.parse import parse_qsl, urlsplit
+
+import pytest
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -160,9 +161,9 @@ def test_count_substr(case, expected):
     "case,expected",
     [
         (
-            "\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf"
-            "\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf"
-            "\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef"
+            "\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf",
+            "\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf",
+            "\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef",
             "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff",
             "AAAAAAAeCEEEEIIIIDNOOOOO OUUUUYThssaaaaaaaeceeeeiiiidnooooo ouuuuythy",
         ),
@@ -412,7 +413,7 @@ def test_lines(case, expected):
 
 @parametrize(
     "case,expected",
-    [  # noqa
+    [
         ("fooBar", "foo bar"),
         ("--foo-Bar--", "foo bar"),
         ("*Foo*B_a*R", "foo b a r"),
@@ -722,7 +723,7 @@ def test_separator_case(case, expected):
     "case,expected",
     [
         (([],), ""),
-        ((tuple(),), ""),
+        (((),), ""),
         (((None,),), ""),
         (((None, None),), ""),
         ((("", None),), ""),
@@ -749,7 +750,7 @@ def test_series_phrase(case, expected):
     "case,expected",
     [
         (([],), ""),
-        ((tuple(),), ""),
+        (((),), ""),
         (((None,),), ""),
         (((None, None),), ""),
         ((("", None),), ""),
@@ -1127,7 +1128,7 @@ def test_unquote(case, expected):
 
 @parametrize(
     "case,expected",
-    [  # noqa
+    [
         ("fooBar", "FOO BAR"),
         ("--foo-Bar--", "FOO BAR"),
         ("*Foo*B_a*R", "FOO B A R"),
@@ -1198,8 +1199,8 @@ def test_url(case, expected):
 
 @parametrize(
     "case,expected",
-    [  # noqa
-        ("hello world!", ["hello", "world"]),  # noqa
+    [
+        ("hello world!", ["hello", "world"]),
         ("hello_world", ["hello", "world"]),
         ("hello!@#$%^&*()_+{}|:\"<>?-=[]\\;\\,.'/world", ["hello", "world"]),
         ("hello 12345 world", ["hello", "12345", "world"]),

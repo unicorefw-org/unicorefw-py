@@ -13,7 +13,7 @@
 
 UniCoreFW is a compact, batteries-included utility library that provides chainable and static helper functions across arrays (lists), objects (dicts / nested structures), functions, strings, security utilities, templates, and optional cryptography helpers.
 
-> **Current version:** `1.1.5`
+> **Current version:** `1.2.0`
 
 ---
 
@@ -23,9 +23,11 @@ UniCoreFW is a compact, batteries-included utility library that provides chainab
   - **Static:** `UniCoreFW.map([...], fn)` / `_.map([...], fn)`
   - **Chainable:** `_(...).map(...).filter(...).value()`
 - **Module-spanning API**
-  - Functions from `array`, `object`, `string`, `function`, `utils`, `types`, `security`, `template`, and `crypto` are attached dynamically as static methods and as chain methods.
+  - Core functions are registered as static and chain methods. Optional crypto
+    compatibility methods load only when called; database and ORM functions
+    are intentionally not collection-chain methods.
 - **Security utilities**
-  - Input validation helpers, string sanitization, rate limiting, and audit logging.
+  - Input validation, bounded local and distributed rate limiting, and audit logging.
 - **Template engine**
   - `<%= var %>` interpolation and simple `<% if cond %> ... <% endif %>` with defensive checks.
 - **Optional cryptography utilities**
@@ -41,13 +43,45 @@ UniCoreFW is a compact, batteries-included utility library that provides chainab
 pip install unicorefw
 ```
 
-### Optional dependency (Crypto module)
+### Optional dependency: crypto
 
-The `unicorefw.crypto` module requires `cryptography`:
+Install the bounded optional dependency set for `unicorefw.crypto`:
 
 ```bash
-pip install cryptography
+pip install "unicorefw[crypto]"
 ```
+
+### Optional dependency: ORM
+
+Install the maintained SQLAlchemy policy layer without selecting a database
+driver:
+
+```bash
+pip install "unicorefw[orm]"
+```
+
+Install the DBAPI driver for your database as another dependency. Async SQLite
+requires `aiosqlite`, while PostgreSQL applications may choose `asyncpg`,
+psycopg, or another SQLAlchemy-supported driver.
+
+### Optional dependencies: database and spreadsheets
+
+Python 3.9 or later can install the bounded relational, MongoDB, and Redis
+driver set used by `unicorefw.db`:
+
+```bash
+pip install "unicorefw[database]"
+```
+
+Excel import and export support uses a separate bounded dependency set:
+
+```bash
+pip install "unicorefw[spreadsheet]"
+```
+
+The spreadsheet extra includes `defusedxml` because upstream openpyxl does not
+enable XML entity-expansion defenses by itself. The base package and
+`unicorefw[core]` install no third-party runtime dependency.
 
 ---
 
@@ -57,6 +91,7 @@ pip install cryptography
 project_root_dir/
 ├── unicorefw/
 │   ├── __init__.py
+│   ├── _exports.py        # explicit lazy-export ownership
 │   ├── core.py
 │   ├── array.py
 │   ├── object.py
@@ -67,6 +102,7 @@ project_root_dir/
 │   ├── security.py
 │   ├── template.py
 │   ├── crypto.py
+│   ├── orm.py
 │   ├── supporter.py
 │   └── db.py              # present (import directly as unicorefw.db)
 ├── examples/
@@ -114,6 +150,12 @@ Chaining works by applying functions across UniCoreFW’s modules in a defined o
 - a chain method on `UniCoreFWWrapper`, and
 - a static method on `UniCoreFW` (without overriding earlier modules’ functions when names collide).
 
+Database and ORM helpers remain available from their submodules, the package
+root, and compatible `UniCoreFW` static calls, but are excluded from collection
+chaining. Importing `unicorefw` alone does not import `core`, `crypto`, `db`,
+`orm`, SQLAlchemy, database drivers, pandas, or openpyxl. Compatibility names
+are resolved from an explicit allowlist and cached on first access.
+
 ---
 
 ## Core Modules (What They Provide)
@@ -128,6 +170,13 @@ flattened = _.flatten([1, [2, [3, 4]]])                    # [1, 2, 3, 4]
 chunked = _.chunk([1, 2, 3, 4, 5, 6], 2)                   # [[1,2],[3,4],[5,6]]
 median = _.find_median_sorted_arrays([1, 3, 5], [2, 4, 6]) # 3.5
 ```
+
+Stable `uniq`, `union`, `intersection`, `difference`, and `xor` paths use
+hash-backed membership and preserve first-occurrence order. Their common
+hashable paths are O(n), or O(n + m) for two-input operations. Unhashable
+values and unhashable derived keys retain equality semantics through a
+quadratic worst-case fallback. Explicit comparator variants such as
+`uniq_with` and `intersection_with` remain pairwise and therefore quadratic.
 
 ### Objects (`unicorefw.object`)
 
@@ -183,16 +232,21 @@ print(is_empty({}))    # True
 
 ### Security (`unicorefw.security`)
 
-Input validation, sanitization, rate limiting, and audit logging primitives.
+Input validation, bounded rate limiting, and audit logging primitives.
 
 ```python
-from unicorefw.security import RateLimiter, AuditLogger, validate_type, sanitize_string
+from unicorefw.security import (
+    AuditLogger,
+    LocalRateLimiter,
+    sanitize_string,
+    validate_type,
+)
 
 validate_type("test", str, "param")
-safe = sanitize_string("  abc  ", max_length=10, allowed_chars="a-zA-Z0-9")
-print(safe)  # "abc"
+constrained = sanitize_string("  abc  ", max_length=10, allowed_chars="a-zA-Z0-9")
+print(constrained)  # "abc"
 
-with RateLimiter(max_calls=100, time_window=60):
+with LocalRateLimiter(max_calls=100, time_window=60):
     pass
 
 with AuditLogger(log_file="security.jsonl") as logger:
@@ -202,6 +256,42 @@ with AuditLogger(log_file="security.jsonl") as logger:
 Audit files are UTF-8 JSON Lines, owner-only on POSIX, and refuse symbolic-link
 destinations where the operating system supports `O_NOFOLLOW`. Do not put
 credentials, tokens, or other secrets in audit details.
+
+`LocalRateLimiter` (also available under the compatible `RateLimiter` name)
+shares state only between threads using the same object in one process. A
+multi-process or multi-host service must use an atomic shared backend:
+
+```python
+from redis import Redis  # application dependency
+from unicorefw.security import DistributedRateLimiter, RedisRateLimitBackend
+
+backend = RedisRateLimitBackend(Redis.from_url(redis_url))
+with DistributedRateLimiter(
+    backend,
+    key=authenticated_client_id,
+    max_calls=100,
+    time_window=60,
+):
+    process_request()
+```
+
+The Redis backend deterministically hashes the supplied identifier before using
+it in a Redis key, uses Redis server time, and admits each request through one
+atomic script. Hashing keeps the raw identifier out of the key name but is not
+anonymization. Backend failures deny the request. Use stable authenticated
+identifiers and configure Redis authentication, encryption, isolation,
+availability, and key eviction for the application's threat model.
+
+`sanitize_string()` constrains text by length and an allowed-character regular
+expression; it is not contextual output encoding. Likewise,
+`strip_html_tags()`/`strip_tags()` only remove tag-shaped text. Use
+`html.escape()` for untrusted HTML text or a maintained allow-list sanitizer
+when limited markup must be accepted. Callable validation establishes only
+that Python can call an object, so callable inputs must come from a trusted
+source.
+
+See the project [security policy](https://github.com/unicorefw-org/unicorefw-py/blob/main/SECURITY.md)
+for supported versions, private vulnerability reporting, and the threat model.
 
 ### Templates (`unicorefw.template`)
 
@@ -279,15 +369,57 @@ length remains capped when the trusted wrapper is used.
 
 ### Crypto (`unicorefw.crypto`) *(optional)*
 
-Fernet symmetric encryption utilities (requires `cryptography`):
+Fernet authenticated encryption utilities require the `crypto` extra:
 
 ```python
-from unicorefw.crypto import generate_key, encrypt_string, decrypt_string
+from unicorefw.crypto import (
+    InvalidToken,
+    decrypt_string,
+    encrypt_string,
+    generate_key,
+)
 
 key = generate_key()
 token = encrypt_string("secret", key)
-print(decrypt_string(token, key))  # "secret"
+
+try:
+    # Reject tokens older than five minutes.
+    plaintext = decrypt_string(token, key, ttl=300)
+except InvalidToken:
+    plaintext = None
 ```
+
+Generate keys with `generate_key()` or Fernet, then store them in a dedicated
+secret manager. Do not commit, log, or place keys in exception messages. Plan
+rotation before deployment; applications that need overlapping old and new
+keys can use `cryptography.fernet.MultiFernet` at their key-management boundary.
+Fernet tokens expose their creation time in plaintext and buffer the complete
+message in memory, so this helper is not suitable for large-file streaming.
+Treat `InvalidToken` as one authentication failure; do not reveal whether a
+token was malformed, expired, or encrypted under another valid key.
+
+### ORM policy layer (`unicorefw.orm`) *(optional)*
+
+The ORM module re-exports SQLAlchemy primitives and centralizes session
+configuration. `session_scope()` supports `async with` and rolls back when the
+request body raises:
+
+```python
+from unicorefw.orm import create_async_engine_from_url, create_async_sessionmaker
+from unicorefw.orm import session_scope
+
+engine = create_async_engine_from_url("sqlite+aiosqlite:///application.db")
+AsyncSessionLocal = create_async_sessionmaker(engine)
+
+async def load_record(record_id):
+    async with session_scope(AsyncSessionLocal) as session:
+        return await session.get(Record, record_id)
+```
+
+Keep credentials outside source code and pass them to SQLAlchemy through your
+deployment secret boundary. Call `await engine.dispose()` during application
+shutdown. The `orm` extra supplies SQLAlchemy and asyncio support; install the
+selected DBAPI driver as another dependency.
 
 ### Database utilities (`unicorefw.db`) *(module present; import directly)*
 
@@ -346,8 +478,76 @@ inserted = DataImporter(db).from_json(
 ```
 
 CSV import counts bytes while reading and rolls its transaction back when a row
-limit expires. Configure limits from trusted application policy, not request
-parameters.
+limit expires. JSON, CSV, Excel, and dictionary imports create a requested table
+inside the same transaction as their inserts, so a failed row does not leave an
+empty table behind. Unexpected parser and driver failures raise
+`DatabaseImportError` without copying file paths, SQL, or driver text into the
+public message. The original error remains available through `__cause__`.
+Configure limits from trusted application policy, not request parameters.
+
+`Database.transaction()` uses a root transaction for the first context and a
+generated savepoint for each nested context. An inner failure rolls back its
+savepoint and leaves the outer transaction active. An outer failure rolls back
+changes from inner contexts that released their savepoints. Direct
+`begin()`, `commit()`, and `rollback()` calls retain their signatures;
+`commit()` and `rollback()` close one managed level at a time. Calls made with
+no managed level reach the driver as before, which preserves existing explicit
+commit and rollback code.
+
+Using `Database` itself as a context manager owns both the connection and a
+managed root transaction. Entry begins the transaction; normal exit resolves
+all managed levels and commits, while exceptional exit rolls them back. Every
+exit closes the cursor and connection. This explicit root transaction is
+important for PostgreSQL, whose direct helper connection otherwise uses
+autocommit outside `transaction()`.
+
+Each `Database` instance is bound to its creating process and thread because it
+owns one mutable cursor and connection. Calls from another thread fail with
+`DatabaseError` before driver access. Create one instance per thread.
+
+Legacy code that already serializes every operation may disable the thread
+check explicitly:
+
+```python
+db = Database(
+    engine="sqlite",
+    database="app.db",
+    check_same_thread=False,
+    unsafe_allow_cross_thread=True,
+)
+```
+
+This option does not add locking, make a cursor safe for concurrent use, or
+permit use after `fork()`. The caller must enable the driver's cross-thread
+mode and provide synchronization. Process ownership cannot be disabled.
+
+Unexpected constructor and connection-pool failures raise
+`DatabaseConnectionError`. Root transaction failures raise `DatabaseError`.
+Public messages exclude driver details and connection parameters; protected
+diagnostics can inspect `__cause__`. Partial driver initialization and pool
+shutdown attempt to close every acquired resource.
+
+MySQL can commit DDL outside savepoint control, so use a native migration tool
+for MySQL schema changes that need transactional guarantees.
+
+The required service test job validates PostgreSQL 17.10 and MySQL 8.4.10 with
+digest-pinned images. Its tests refuse remote hosts, privileged database users,
+unexpected ports, and database names other than `unicorefw_test`; local runs
+skip unless the integration environment is enabled explicitly.
+
+`Migration` validates versions and scripts, verifies the checksum of an
+already-applied version, and applies SQLite DDL and tracking records in one
+transaction. SQLite statement boundaries use the native parser, so semicolons
+inside strings and trigger bodies remain intact. PostgreSQL receives the
+complete script through its DB-API driver. MySQL scripts use quote-aware and
+comment-aware statement boundaries because PyMySQL does not enable
+multi-statement execution by default. MySQL scripts that depend on client-side
+`DELIMITER` directives require a native migration tool.
+
+`DataImporter.from_sql()` accepts trusted SQLite scripts only. It executes the
+script against an isolated snapshot, denies external database attachment and
+writable-schema pragmas, and replaces the target only after the complete script
+succeeds.
 
 SQLite backup and restore use atomic owner-only files on POSIX. Restore builds an
 isolated in-memory database before it changes the target.
@@ -407,9 +607,26 @@ Run the branch-coverage gate before submitting changes:
 ```bash
 python -m pytest tests --cov=unicorefw --cov-branch \
   --cov-report=term-missing --cov-report=xml --cov-report=json \
-  --cov-fail-under=76
+  --cov-fail-under=83
 ```
 
-CI rejects regressions below the current 76% ratchet. The project target is 100%
-statement and branch coverage; maintainers raise the ratchet after each coverage
-slice.
+CI rejects regressions below the current verified 83% ratchet. The interim
+coverage baseline is 95% statement and branch coverage, and the ultimate
+project target is 100%; maintainers raise the executable ratchet as each
+baseline is reached.
+
+Before submitting a security-sensitive change, also run:
+
+```bash
+python scripts/verify_security_policy.py suppressions --root .
+bandit -r unicorefw -ll
+git ls-files --cached --others --exclude-standard -z |
+  xargs -0 detect-secrets-hook --no-verify
+```
+
+The CI environment pins `detect-secrets==1.5.0` and audits its installed
+dependency graph. Inline Bandit or secret-scanner exceptions require exact
+scope, a review rationale, and a future expiry date. CodeQL exceptions use the
+same policy through `security/suppressions.json`. See
+[SECURITY.md](https://github.com/unicorefw-org/unicorefw-py/blob/main/SECURITY.md)
+before recording or renewing an exception.
