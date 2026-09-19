@@ -13,6 +13,9 @@ the Free Software Foundation.
 You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
+
+from __future__ import annotations
+
 import threading
 import time
 from collections.abc import Callable

@@ -14,17 +14,19 @@ You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
+from __future__ import annotations
+
 import ast
 import re
 import unicodedata
 from collections.abc import Callable, Iterable
-from collections.abc import Sequence as TypingSequence
+from typing import Sequence as TypingSequence
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Dict, List, Tuple, Union, cast
 
 from .security import ResourceLimitError, _validate_resource_limit
 
-PathKey = str | int | tuple[Any, ...]
+PathKey = Union[str, int, Tuple[Any, ...]]
 Path = TypingSequence[PathKey]
 
 _HARD_MAX_PATH_LENGTH = 65_536
@@ -445,7 +447,7 @@ def _set_by_path(
             if isinstance(seg, int):
                 if not isinstance(cur, list):
                     raise TypeError("Internal error: expected list container")
-                seq = cast(list[Any], cur)
+                seq = cast(List[Any], cur)
                 # while len(seq) <= seg:
                 #     seq.append(None)
                 _ensure_len(
@@ -458,7 +460,7 @@ def _set_by_path(
                 # seg can be str OR tuple (PathKey excludes int here)
                 if not isinstance(cur, dict):
                     raise TypeError("Internal error: expected dict container")
-                mp = cast(dict[Any, Any], cur)
+                mp = cast(Dict[Any, Any], cur)
                 mp[seg] = value
             return
 
@@ -468,7 +470,7 @@ def _set_by_path(
             # current must be a list
             if not isinstance(cur, list):
                 raise TypeError("Internal error: expected list container")
-            seq = cast(list[Any], cur)
+            seq = cast(List[Any], cur)
             _ensure_len(
                 seq,
                 seg + 1,
@@ -478,16 +480,16 @@ def _set_by_path(
             if seq[seg] is None or not isinstance(seq[seg], (dict, list)):
                 # list element becomes list if next is int, else dict
                 seq[seg] = [] if isinstance(nxt, int) else {}
-            cur = cast(dict[Any, Any] | list[Any], seq[seg])
+            cur = cast(Union[Dict[Any, Any], List[Any]], seq[seg])
         else:
             # current must be a dict
             if not isinstance(cur, dict):
                 raise TypeError("Internal error: expected dict container")
-            mp = cast(dict[Any, Any], cur)
+            mp = cast(Dict[Any, Any], cur)
             if seg not in mp or not isinstance(mp[seg], (dict, list)):
                 # under a dict key, create list only if the NEXT segment is an int
                 mp[seg] = [] if isinstance(nxt, int) else {}
-            cur = cast(dict[Any, Any] | list[Any], mp[seg])
+            cur = cast(Union[Dict[Any, Any], List[Any]], mp[seg])
 
 
 def _parse_path_str(

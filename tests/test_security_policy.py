@@ -118,20 +118,20 @@ def test_suppression_policy_accepts_scoped_future_exceptions(tmp_path):
         ('query = "SELECT 1"  # nosec\n', "blanket"),
         ('query = "SELECT 1"  # nosec B608\n', "requires adjacent"),
         (
-            "# Security suppression: codes=B607; ",
-            f"expires={FUTURE}; rationale=Documented narrow test exception.\n",
+            "# Security suppression: codes=B607; "
+            f"expires={FUTURE}; rationale=Documented narrow test exception.\n"
             'query = "SELECT 1"  # nosec B608\n',
             "codes do not match",
         ),
         (
-            "# Security suppression: codes=B608; expires=2026-07-28; ",
-            "rationale=Documented narrow test exception.\n",
+            "# Security suppression: codes=B608; expires=2026-07-28; "
+            "rationale=Documented narrow test exception.\n"
             'query = "SELECT 1"  # nosec B608\n',
             "expired",
         ),
         (
-            "# Security suppression: codes=B608; ",
-            f"expires={FUTURE}; rationale=too short\n",
+            "# Security suppression: codes=B608; "
+            f"expires={FUTURE}; rationale=too short\n"
             'query = "SELECT 1"  # nosec B608\n',
             "at least 20",
         ),

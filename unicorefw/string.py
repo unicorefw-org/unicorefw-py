@@ -15,6 +15,9 @@ the Free Software Foundation.
 You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
+
+from __future__ import annotations
+
 import math
 import re
 import string as _st

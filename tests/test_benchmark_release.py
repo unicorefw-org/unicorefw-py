@@ -35,7 +35,7 @@ def _new_cases():
 
 def test_release_benchmark_registry_covers_each_local_callable_once():
     audit = benchmark_release.audit_cases(
-        benchmark_release.discover_public_api_names(UniCoreFW), # type: ignore
+        benchmark_release.discover_public_api_names(UniCoreFW),
         benchmark_release.build_all_cases(),
     )
 
@@ -92,7 +92,7 @@ def test_new_cases_report_missing_for_an_older_release_api():
 
 
 def test_release_registry_filters_one_api():
-    selected = benchmark_release._selected_registry(frozenset(), "identity") # type: ignore
+    selected = benchmark_release._selected_registry(frozenset(), "identity")
 
     assert [(case.category, case.name) for case in selected] == [
         ("utility", "identity")

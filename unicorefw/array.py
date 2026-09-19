@@ -13,6 +13,8 @@ You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
+from __future__ import annotations
+
 import bisect
 import builtins  # Import Python's built-ins to avoid recursion
 import random as random_module

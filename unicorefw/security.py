@@ -14,6 +14,8 @@ You should have received a copy of the [BSD-3-Clause] license
 along with UniCoreFW. If not, see https://www.gnu.org/licenses/.
 """
 
+from __future__ import annotations
+
 import hashlib as _hashlib
 import json
 import logging
@@ -29,7 +31,10 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from typing_extensions import Self
+try:  # ``Self`` was added to typing in Python 3.11.
+    from typing import Self
+except ImportError:  # pragma: no cover - exercised on Python 3.7-3.10
+    Self = Any  # type: ignore[misc, assignment]
 
 
 class SecurityError(Exception):
