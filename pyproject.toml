@@ -24,6 +24,7 @@ output = "coverage.xml"
 output = "coverage.json"
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 markers = [
     "database_integration: requires dedicated loopback PostgreSQL and MySQL services",
     "redis_integration: requires a dedicated loopback Redis service",
