@@ -10,6 +10,9 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.dont_write_bytecode = True
+
 import unicorefw
 from scripts import benchmark_imports
 from scripts.benchmark_imports import ImportBudgetError, benchmark_import

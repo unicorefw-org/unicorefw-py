@@ -10,10 +10,10 @@ from typing import Any
 
 import pytest
 
-from scripts import benchmark_collections
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.dont_write_bytecode = True
+
+from scripts import benchmark_collections
 
 array_module = importlib.import_module("unicorefw.array")
 
