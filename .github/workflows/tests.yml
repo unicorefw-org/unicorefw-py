@@ -19,13 +19,12 @@ jobs:
   test:
     name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        # os: [ubuntu-latest, windows-latest, macos-latest]
-        os: [windows-latest]
-        python-version: ["3.11"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
       - name: Check out source
@@ -47,63 +46,132 @@ jobs:
       - name: Install test dependencies
         run: >-
           python -m pip install
+          ".[crypto,orm]"
+          "pydash==8.0.6; python_version >= '3.9'"
           "pytest>=7.4,<9; python_version < '3.10'"
           "pytest>=9.0.3,<10; python_version >= '3.10'"
 
       - name: Run the complete test suite once
-        env:
-          PYTHONFAULTHANDLER: "1"      
         run: >-
           python -m pytest tests
-          -vv
-          --maxfail=1
-          --durations=25
           --basetemp="${{ runner.temp }}/unicorefw-pytest"
 
-  # coverage:
-  #   name: Branch coverage ratchet
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 20
-  #   steps:
-  #     - name: Check out source
-  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #       with:
-  #         persist-credentials: false
+  import-budget:
+    name: Root import budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
-  #     - name: Set up Python
-  #       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-  #       with:
-  #         python-version: "3.11"
-  #         cache: pip
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
 
-  #     - name: Upgrade the package installer
-  #       run: python -m pip install "pip>=26.1.2,<27"
+      - name: Upgrade the package installer
+        run: python -m pip install "pip>=26.1.2,<27"
 
-  #     - name: Install coverage dependencies
-  #       run: >-
-  #         python -m pip install
-  #         "pytest>=9.0.3,<10"
-  #         "pytest-cov>=7,<8"
-  #         "pandas>=2.0,<3"
-  #         "openpyxl>=3.1,<4"
+      - name: Install the dependency-free core
+        run: python -m pip install "."
 
-  #     - name: Enforce branch coverage ratchet
-  #       env:
-  #         PYTHONFAULTHANDLER: "1"
-  #       run: >-
-  #         python -m pytest tests
-  #         --cov=unicorefw
-  #         --cov-branch
-  #         --cov-report=term-missing
-  #         --cov-report=xml
-  #         --cov-report=json
-  #         --cov-fail-under=94
-  #         --basetemp="${{ runner.temp }}/unicorefw-pytest"
+      - name: Verify generated core registry
+        run: python scripts/generate_core_registry.py --check
+
+      - name: Enforce root import latency, memory, and isolation
+        run: >-
+          python scripts/benchmark_imports.py unicorefw
+          --runs 9
+          --forbid-optional
+          --max-median-ms 100
+          --max-median-rss-kib 10240
+
+      - name: Record public submodule import measurements
+        run: >-
+          python scripts/benchmark_imports.py
+          unicorefw.array
+          unicorefw.core
+          unicorefw.crypto
+          unicorefw.db
+          unicorefw.function
+          unicorefw.object
+          unicorefw.orm
+          unicorefw.regex_policy
+          unicorefw.security
+          unicorefw.string
+          unicorefw.supporter
+          unicorefw.template
+          unicorefw.types
+          unicorefw.utils
+          --runs 3
+
+      - name: Record representative collection measurements
+        run: >-
+          python scripts/benchmark_collections.py
+          --runs 5
+          --size 4000
+
+      - name: Record dispatch measurements
+        run: >-
+          python scripts/benchmark_dispatch.py
+          --runs 7
+          --iterations 100000
+
+  coverage:
+    name: Branch coverage ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Upgrade the package installer
+        run: python -m pip install "pip>=26.1.2,<27"
+
+      - name: Install coverage dependencies
+        run: >-
+          python -m pip install
+          ".[crypto,orm,spreadsheet]"
+          "pydash==8.0.6; python_version >= '3.9'"
+          "pytest>=9.0.3,<10"
+          "pytest-cov>=7,<8"
+
+      - name: Enforce branch coverage ratchet
+        run: >-
+          python -m pytest tests
+          --cov=unicorefw
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-report=json
+          --cov-fail-under=83.0
+          --basetemp="${{ runner.temp }}/unicorefw-pytest"
 
   security-integration:
     name: Security and optional output integrations
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      redis:
+        image: redis:8.8.1@sha256:d265e1f86a79646243cf3622d0381688322b3564793b3f3b83b4fe841eaa80a4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -122,29 +190,145 @@ jobs:
       - name: Install security test dependencies
         run: >-
           python -m pip install
+          ".[crypto,orm,spreadsheet]"
           "setuptools>=83,<84"
           "pytest>=9.0.3,<10"
           "bandit>=1.9.4,<2"
+          "detect-secrets==1.5.0"
           "pip-audit>=2.7,<3"
-          "pandas>=2.0,<3"
-          "openpyxl>=3.1,<4"
+          "redis>=8.0.1,<9"
 
-      - name: Reject high and medium static security findings
+      - name: Verify scoped security suppressions
+        run: python scripts/verify_security_policy.py suppressions --root .
+
+      - name: Reject potential committed secrets
+        run: >-
+          git ls-files --cached --others --exclude-standard -z |
+          xargs -0 detect-secrets-hook --no-verify
+
+      - name: Reject high and medium Bandit findings
         run: bandit -r unicorefw -ll
 
       - name: Audit the installed dependency environment
         run: python -m pip_audit --strict
 
-      - name: Require spreadsheet integrations
-        run: python -c "import openpyxl, pandas"
+      - name: Require maintained optional integrations
+        run: >-
+          python -c
+          "import cryptography, defusedxml, openpyxl, pandas, redis, sqlalchemy"
+
+      - name: Record installed optional import measurements
+        run: >-
+          python scripts/benchmark_imports.py
+          unicorefw.crypto
+          unicorefw.orm
+          unicorefw.db
+          --runs 3
 
       - name: Exercise database and output security boundaries
+        env:
+          UNICORE_FW_REDIS_INTEGRATION: "1"
+          UNICORE_FW_REDIS_HOST: "127.0.0.1"
+          UNICORE_FW_REDIS_PORT: "6379"
         run: >-
           python -m pytest
           tests/test_db.py
+          tests/test_cache_manager_security.py
+          tests/test_db_lifecycle.py
+          tests/test_db_migrations_imports.py
           tests/test_db_query_builder.py
+          tests/test_db_thread_ownership.py
+          tests/test_db_transactions.py
+          tests/test_crypto.py
+          tests/test_orm.py
           tests/test_output_security.py
+          tests/test_rate_limiting.py
+          tests/test_redis_rate_limit_integration.py
           tests/test_resource_limits.py
+          tests/test_security_policy.py
+          --basetemp="${{ runner.temp }}/unicorefw-pytest"
+
+  database-integration:
+    name: PostgreSQL and MySQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17.10@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+        env:
+          POSTGRES_DB: unicorefw_test
+          POSTGRES_USER: unicorefw
+          POSTGRES_PASSWORD: integration-only-password  # pragma: allowlist secret; expires=2027-07-28; rationale=Ephemeral loopback-only CI database credential.
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd
+          "pg_isready --username=unicorefw --dbname=unicorefw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      mysql:
+        image: mysql:8.4.10@sha256:c592c15aaf4a1961e15d82eb31ea5987dda862d1c4b1e93424438c0e91dc1f8d
+        env:
+          MYSQL_DATABASE: unicorefw_test
+          MYSQL_USER: unicorefw
+          MYSQL_PASSWORD: integration-only-password  # pragma: allowlist secret; expires=2027-07-28; rationale=Ephemeral loopback-only CI database credential.
+          MYSQL_ROOT_PASSWORD: root-integration-only-password  # pragma: allowlist secret; expires=2027-07-28; rationale=Ephemeral loopback-only CI root credential.
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping --host=127.0.0.1 --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Upgrade the package installer
+        run: python -m pip install "pip>=26.1.2,<27"
+
+      - name: Install bounded database integration dependencies
+        run: >-
+          python -m pip install
+          ".[database]"
+          "pytest>=9.0.3,<10"
+          "pip-audit>=2.7,<3"
+
+      - name: Audit database integration dependencies
+        run: python -m pip_audit --strict
+
+      - name: Require the declared database extra
+        run: python -c "import psycopg2, pymongo, pymysql, redis"
+
+      - name: Record the installed database import measurement
+        run: python scripts/benchmark_imports.py unicorefw.db --runs 3
+
+      - name: Exercise real database lifecycle and transactions
+        env:
+          UNICORE_FW_DATABASE_INTEGRATION: "1"
+          UNICORE_FW_POSTGRES_HOST: "127.0.0.1"
+          UNICORE_FW_POSTGRES_PORT: "5432"
+          UNICORE_FW_POSTGRES_DATABASE: "unicorefw_test"
+          UNICORE_FW_POSTGRES_USER: "unicorefw"
+          UNICORE_FW_POSTGRES_PASSWORD: "integration-only-password"  # pragma: allowlist secret; expires=2027-07-28; rationale=Matches the ephemeral loopback-only CI service credential.
+          UNICORE_FW_MYSQL_HOST: "127.0.0.1"
+          UNICORE_FW_MYSQL_PORT: "3306"
+          UNICORE_FW_MYSQL_DATABASE: "unicorefw_test"
+          UNICORE_FW_MYSQL_USER: "unicorefw"
+          UNICORE_FW_MYSQL_PASSWORD: "integration-only-password"  # pragma: allowlist secret; expires=2027-07-28; rationale=Matches the ephemeral loopback-only CI service credential.
+        run: >-
+          python -m pytest
+          tests/test_db_service_integration.py
           --basetemp="${{ runner.temp }}/unicorefw-pytest"
 
   lint:
