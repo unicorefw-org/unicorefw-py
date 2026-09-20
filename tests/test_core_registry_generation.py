@@ -101,6 +101,10 @@ def test_metadata_is_deterministic_across_python_processes():
     )
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Metadata intentionally preserves Unicode documentation.  Force the
+    # child interpreter and the parent pipe to use the same portable encoding
+    # instead of the Windows console code page.
+    environment["PYTHONIOENCODING"] = "utf-8"
 
     outputs = [
         subprocess.run(
@@ -110,6 +114,7 @@ def test_metadata_is_deterministic_across_python_processes():
             cwd=generate_core_registry.PROJECT_ROOT,
             env=environment,
             text=True,
+            encoding="utf-8",
             timeout=30,
         ).stdout
         for _run in range(2)
@@ -491,6 +496,7 @@ def test_registry_generation_does_not_import_database_or_orm_modules():
     )
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
 
     completed = subprocess.run(
         [sys.executable, "-c", source],
@@ -499,6 +505,7 @@ def test_registry_generation_does_not_import_database_or_orm_modules():
         cwd=generate_core_registry.PROJECT_ROOT,
         env=environment,
         text=True,
+        encoding="utf-8",
         timeout=30,
     )
 
