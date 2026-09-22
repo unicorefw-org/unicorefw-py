@@ -6,7 +6,7 @@ All notable changes to UniCoreFW are recorded here. The project follows
 Each implementation slice must record its behavior changes, compatibility
 impact, and verification evidence in this file.
 
-## [Unreleased]
+## [1.2.0]
 
 ### Security
 
@@ -58,7 +58,6 @@ impact, and verification evidence in this file.
 - Added `--verbose` to the release and pydash benchmark scripts. Inventory and
   summary sections are now suppressed from normal text output and remain
   available on request; JSON reports are unchanged.
-
 - Added `scripts/benchmark_pydash.py`, a bounded, process-isolated comparison
   of 240 verified `UniCoreFW.<function>` and pydash calls. The report separates
   incompatible and package-specific APIs instead of assigning them timing
@@ -183,13 +182,11 @@ impact, and verification evidence in this file.
 - Full verification after the assignment/customizer batch passes 1,953 tests
   with 15 skips; combined branch coverage reaches 88.79%, `object.py` reaches
   80.06%, and `function.py` measures 99.42%.
-
 - Verified all 68 Python files under `unicorefw/`, `tests/`, and `scripts/`
   with AST parsing, Ruff 0.16.3 fatal syntax/undefined-name rules (`E9`, `F63`,
   `F7`, and `F82`), and the CI-equivalent Flake8 rules; no findings remain.
   Full default Ruff linting remains a separate, unconfigured modernization
   effort because it reports 1,254 existing style and modernization findings.
-
 - Began the array-vs-pydash performance campaign with semantics-preserving
   fast paths: hashable uniqueness now uses `dict.fromkeys()` where applicable;
   removal APIs use expected O(n) set membership; finite-depth flattening uses a
@@ -207,7 +204,6 @@ impact, and verification evidence in this file.
   for `interleave`. These changes preserve equality fallbacks; focused timing
   remains runner-dependent and the APIs still require confirmation on the
   project's authoritative Python 3.10 environment.
-
 - Crypto backend failures now use `CryptoUnavailableError`, invalid key material
   uses `InvalidKey`, and authentication failures use the package's
   `InvalidToken`.
@@ -511,7 +507,6 @@ impact, and verification evidence in this file.
 - Regenerated the stale `docs/api/core-exports.json` artifact. The core
   registry generator entry point and committed-artifact drift checks now pass;
   the focused registry generation suite passes all 29 tests.
-
 - Corrected the immutable `pypa/gh-action-pypi-publish` v1.14.0 reference. The
   previous SHA had no matching GHCR image, so the publish job stopped before
   requesting a PyPI trusted-publishing token or uploading an artifact.
@@ -1279,13 +1274,13 @@ first pinned CI benchmark execution pending
 Local Python 3.10.12 medians use seven runs of 100,000 calls, except the
 nine-run cold import:
 
-| Scenario | Before | After | Change |
-|---|---:|---:|---:|
-| Direct call | 164.116 ns | 185.963 ns | 13.31% slower |
-| `UniCoreFW` static call | 152.526 ns | 186.908 ns | 22.54% slower |
-| `_` factory-static call | 161.056 ns | 149.106 ns | 7.42% faster |
-| Five-step chain | 4,930.602 ns | 4,150.976 ns | 15.81% faster |
-| Cold `unicorefw.core` import | 206.092 ms | 314.536 ms | 52.62% slower |
+| Scenario                      |       Before |        After |        Change |
+| ----------------------------- | -----------: | -----------: | ------------: |
+| Direct call                   |   164.116 ns |   185.963 ns | 13.31% slower |
+| `UniCoreFW` static call     |   152.526 ns |   186.908 ns | 22.54% slower |
+| `_` factory-static call     |   161.056 ns |   149.106 ns |  7.42% faster |
+| Five-step chain               | 4,930.602 ns | 4,150.976 ns | 15.81% faster |
+| Cold`unicorefw.core` import |   206.092 ms |   314.536 ms | 52.62% slower |
 
 The unchanged direct-call control also moved by more than 10%, showing
 material host-frequency noise in these nanosecond samples. Cold-import
@@ -1325,7 +1320,7 @@ chain calls remain available. Code that tested for or invoked
 `UniCoreFWWrapper.generate_key` must use the static surface because those
 functions accept no wrapped input.
 
-## [1.1.5] - 2026-07-22
+## [1.1.5][1.1.5] - 2026-07-22
 
 ### Security
 
@@ -1415,13 +1410,13 @@ Status: Planning sample complete; formal benchmark baseline pending
 
 Local Python 3.10.12 results:
 
-| Sample | Result |
-|---|---:|
-| Cold `import unicorefw` | 0.94 to 0.99 seconds |
-| Import maximum RSS delta | about 28,924 KiB |
-| `uniq(range(10_000))` | 0.398 seconds |
-| `union(range(10_000))` | 0.384 seconds |
-| `intersection(range(5_000), range(5_000))` | 0.196 seconds |
+| Sample                                       |               Result |
+| -------------------------------------------- | -------------------: |
+| Cold`import unicorefw`                     | 0.94 to 0.99 seconds |
+| Import maximum RSS delta                     |     about 28,924 KiB |
+| `uniq(range(10_000))`                      |        0.398 seconds |
+| `union(range(10_000))`                     |        0.384 seconds |
+| `intersection(range(5_000), range(5_000))` |        0.196 seconds |
 
 The import loaded installed SQLAlchemy and cryptography stacks. The collection
 samples confirmed quadratic membership paths. These one-shot samples guide
@@ -1830,14 +1825,14 @@ Verification:
 
 ### Current optimization status
 
-| Phase | Scope | Status | Exit evidence |
-|---|---|---|---|
-| 0 | Containment and reproducible baseline | In progress | Full CI suite, API manifest, coverage, benchmark, artifact baseline, publication gate |
-| 1 | Security remediation | In progress | SEC-001 through SEC-003 and SEC-005 through SEC-008 repository-complete; SEC-004 external OIDC activation pending |
-| 2 | Performance remediation | In progress | PERF-001 and PERF-002 repository-complete; wrapper dispatch, streaming/bulk paths, and hosted benchmark execution remain |
-| 3 | Stability and API repair | In progress | Unified exports, database/ORM matrix, deterministic concurrency, type ratchet |
-| 4 | Scalability | Pending | Bounded pools/caches, streaming backpressure, large-data tests |
-| 5 | Sustainability and UX | Pending | Modern packaging, enforced quality gates, generated docs, governance files |
+| Phase | Scope                                 | Status      | Exit evidence                                                                                                            |
+| ----- | ------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 0     | Containment and reproducible baseline | In progress | Full CI suite, API manifest, coverage, benchmark, artifact baseline, publication gate                                    |
+| 1     | Security remediation                  | In progress | SEC-001 through SEC-003 and SEC-005 through SEC-008 repository-complete; SEC-004 external OIDC activation pending        |
+| 2     | Performance remediation               | In progress | PERF-001 and PERF-002 repository-complete; wrapper dispatch, streaming/bulk paths, and hosted benchmark execution remain |
+| 3     | Stability and API repair              | In progress | Unified exports, database/ORM matrix, deterministic concurrency, type ratchet                                            |
+| 4     | Scalability                           | Pending     | Bounded pools/caches, streaming backpressure, large-data tests                                                           |
+| 5     | Sustainability and UX                 | Pending     | Modern packaging, enforced quality gates, generated docs, governance files                                               |
 
 #### Audit limitations
 
@@ -1865,5 +1860,5 @@ Verification:
 - Keep publication paused until maintainers rehearse the protected PyPI OIDC
   and provenance path.
 
-[Unreleased]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.5...HEAD
+[1.2.0]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.5...HEAD
 [1.1.5]: https://github.com/unicorefw-org/unicorefw-py/compare/v1.1.4...v1.1.5
