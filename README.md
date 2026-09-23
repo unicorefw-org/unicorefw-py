@@ -4,6 +4,7 @@
 
 [![Publish to PyPi](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/release.yml/badge.svg)](https://pypistats.org/packages/unicorefw)
 [![Unit Tests](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml/badge.svg)](https://github.com/unicorefw-org/unicorefw-py/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/unicorefw-org/unicorefw-py/branch/main/graph/badge.svg)](https://codecov.io/gh/unicorefw-org/unicorefw-py)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)](https://www.python.org/downloads/)
 
@@ -13,7 +14,7 @@
 
 UniCoreFW is a compact, batteries-included utility library that provides chainable and static helper functions across arrays (lists), objects (dicts / nested structures), functions, strings, security utilities, templates, and optional cryptography helpers.
 
-> **Current version:** `1.2.0`
+> **Current version:** `1.1.5`
 
 ---
 

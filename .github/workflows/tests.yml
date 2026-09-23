@@ -56,75 +56,77 @@ jobs:
           python -m pytest tests
           --basetemp="${{ runner.temp }}/unicorefw-pytest"
 
-  # TODO: Re-enable the root import budget once the core registry is fully generated and verified.
-  # import-budget:
-  #   name: Root import budget
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 10
-  #   steps:
-  #     - name: Check out source
-  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #       with:
-  #         persist-credentials: false
+  import-budget:
+    name: Root import budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
-  #     - name: Set up Python
-  #       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-  #       with:
-  #         python-version: "3.11.9"
-  #         cache: pip
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
 
-  #     - name: Upgrade the package installer
-  #       run: python -m pip install "pip>=26.1.2,<27"
+      - name: Upgrade the package installer
+        run: python -m pip install "pip>=26.1.2,<27"
 
-  #     - name: Install the dependency-free core
-  #       run: python -m pip install "."
+      - name: Install the dependency-free core
+        run: python -m pip install "."
 
-  #     - name: Verify generated core registry
-  #       run: python scripts/generate_core_registry.py --check
+      - name: Verify generated core registry
+        run: python scripts/generate_core_registry.py --check
 
-  #     - name: Enforce root import latency, memory, and isolation
-  #       run: >-
-  #         python scripts/benchmark_imports.py unicorefw
-  #         --runs 9
-  #         --forbid-optional
-  #         --max-median-ms 100
-  #         --max-median-rss-kib 10240
+      - name: Enforce root import latency, memory, and isolation
+        run: >-
+          python scripts/benchmark_imports.py unicorefw
+          --runs 9
+          --forbid-optional
+          --max-median-ms 100
+          --max-median-rss-kib 10240
 
-  #     - name: Record public submodule import measurements
-  #       run: >-
-  #         python scripts/benchmark_imports.py
-  #         unicorefw.array
-  #         unicorefw.core
-  #         unicorefw.crypto
-  #         unicorefw.db
-  #         unicorefw.function
-  #         unicorefw.object
-  #         unicorefw.orm
-  #         unicorefw.regex_policy
-  #         unicorefw.security
-  #         unicorefw.string
-  #         unicorefw.supporter
-  #         unicorefw.template
-  #         unicorefw.types
-  #         unicorefw.utils
-  #         --runs 3
+      - name: Record public submodule import measurements
+        run: >-
+          python scripts/benchmark_imports.py
+          unicorefw.array
+          unicorefw.core
+          unicorefw.crypto
+          unicorefw.db
+          unicorefw.function
+          unicorefw.object
+          unicorefw.orm
+          unicorefw.regex_policy
+          unicorefw.security
+          unicorefw.string
+          unicorefw.supporter
+          unicorefw.template
+          unicorefw.types
+          unicorefw.utils
+          --runs 3
 
-  #     - name: Record representative collection measurements
-  #       run: >-
-  #         python scripts/benchmark_collections.py
-  #         --runs 5
-  #         --size 4000
+      - name: Record representative collection measurements
+        run: >-
+          python scripts/benchmark_collections.py
+          --runs 5
+          --size 4000
 
-  #     - name: Record dispatch measurements
-  #       run: >-
-  #         python scripts/benchmark_dispatch.py
-  #         --runs 7
-  #         --iterations 100000
+      - name: Record dispatch measurements
+        run: >-
+          python scripts/benchmark_dispatch.py
+          --runs 7
+          --iterations 100000
 
   coverage:
     name: Branch coverage ratchet
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -158,6 +160,14 @@ jobs:
           --cov-report=json
           --cov-fail-under=83.0
           --basetemp="${{ runner.temp }}/unicorefw-pytest"
+
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5.5.4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: true
+          use_oidc: true
 
   security-integration:
     name: Security and optional output integrations
@@ -199,8 +209,8 @@ jobs:
           "pip-audit>=2.7,<3"
           "redis>=8.0.1,<9"
 
-      # - name: Verify scoped security suppressions
-      #   run: python scripts/verify_security_policy.py suppressions --root .
+      - name: Verify scoped security suppressions
+        run: python scripts/verify_security_policy.py suppressions --root .
 
       - name: Reject potential committed secrets
         run: >-
@@ -210,21 +220,21 @@ jobs:
       - name: Reject high and medium Bandit findings
         run: bandit -r unicorefw -ll
 
-      # - name: Audit the installed dependency environment
-      #   run: python -m pip_audit --strict
+      - name: Audit the installed dependency environment
+        run: python -m pip_audit --strict
 
       - name: Require maintained optional integrations
         run: >-
           python -c
           "import cryptography, defusedxml, openpyxl, pandas, redis, sqlalchemy"
 
-      # - name: Record installed optional import measurements
-      #   run: >-
-      #     python scripts/benchmark_imports.py
-      #     unicorefw.crypto
-      #     unicorefw.orm
-      #     unicorefw.db
-      #     --runs 3
+      - name: Record installed optional import measurements
+        run: >-
+          python scripts/benchmark_imports.py
+          unicorefw.crypto
+          unicorefw.orm
+          unicorefw.db
+          --runs 3
 
       - name: Exercise database and output security boundaries
         env:
@@ -246,7 +256,7 @@ jobs:
           tests/test_rate_limiting.py
           tests/test_redis_rate_limit_integration.py
           tests/test_resource_limits.py
-          # tests/test_security_policy.py
+          tests/test_security_policy.py
           --basetemp="${{ runner.temp }}/unicorefw-pytest"
 
   database-integration:
@@ -305,14 +315,14 @@ jobs:
           "pytest>=9.0.3,<10"
           "pip-audit>=2.7,<3"
 
-      # - name: Audit database integration dependencies
-      #   run: python -m pip_audit --strict -vv
+      - name: Audit database integration dependencies
+        run: python -m pip_audit --strict
 
       - name: Require the declared database extra
         run: python -c "import psycopg2, pymongo, pymysql, redis"
 
-      # - name: Record the installed database import measurement
-      #   run: python scripts/benchmark_imports.py unicorefw.db --runs 3
+      - name: Record the installed database import measurement
+        run: python scripts/benchmark_imports.py unicorefw.db --runs 3
 
       - name: Exercise real database lifecycle and transactions
         env:
