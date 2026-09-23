@@ -192,8 +192,8 @@ def test_test_workflow_enforces_branch_coverage_ratchet():
     assert "--basetemp=" in workflow
     assert "id-token: write" in workflow
     assert (
-        "codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe"
-        " # v5.5.4" in workflow
+        "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac"
+        " # v5.5.5" in workflow
     )
     assert "files: ./coverage.xml" in workflow
     assert "use_oidc: true" in workflow

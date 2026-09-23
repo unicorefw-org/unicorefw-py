@@ -504,12 +504,21 @@ impact, and verification evidence in this file.
 
 ### Fixed
 
+- Resolved CodeQL security-gate findings by keeping generated registry staging
+  files owner-only and constructing the intentional test-only ReDoS rejection
+  fixture dynamically so it is not analyzed as production regex input.
 - Regenerated the stale `docs/api/core-exports.json` artifact. The core
   registry generator entry point and committed-artifact drift checks now pass;
   the focused registry generation suite passes all 29 tests.
 - Corrected the immutable `pypa/gh-action-pypi-publish` v1.14.0 reference. The
   previous SHA had no matching GHCR image, so the publish job stopped before
   requesting a PyPI trusted-publishing token or uploading an artifact.
+- Updated the PyPI publisher to the immutable v1.14.1 commit with a confirmed
+  GHCR image, while preserving OIDC trusted publishing and attestations.
+- Updated the immutable Codecov upload step to v5.5.5, which includes the
+  Codecov keybase verification-key fix that prevents GPG signature failures.
+  Coverage reports use GitHub OIDC rather than a long-lived upload token, and
+  the README now displays the Codecov percentage badge.
 - Made `session_scope()` implement its documented async context-manager
   contract, including rollback when the caller body raises.
 - Retained the MongoDB client until database shutdown, stopped forwarding the
