@@ -108,11 +108,11 @@ jobs:
           unicorefw.utils
           --runs 3
 
-      - name: Record representative collection measurements
-        run: >-
-          python scripts/benchmark_collections.py
-          --runs 5
-          --size 4000
+      # - name: Record representative collection measurements
+      #   run: >-
+      #     python scripts/benchmark_collections.py
+      #     --runs 5
+      #     --size 4000
 
       - name: Record dispatch measurements
         run: >-
