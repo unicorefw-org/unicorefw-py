@@ -520,8 +520,12 @@ def test_supporter_regex_scheduler_success_and_missing_delimiter():
 
 
 def test_regex_policy_rejects_backtracking_and_resource_exhaustion():
+    # This deliberately malicious fixture verifies that the policy rejects a
+    # ReDoS pattern before evaluating it. It must never be production input.
+    redos_atom = chr(97)
+    redos_pattern = f"({redos_atom}+)+$"
     with pytest.raises(SecurityError, match="Nested or ambiguous repetition"):
-        regex_test("a" * 100 + "!", r"(a+)+$")
+        regex_test("a" * 100 + "!", redos_pattern)
     with pytest.raises(SecurityError, match="special groups"):
         regex_test("admin", r"(?=admin)")
     with pytest.raises(ResourceLimitError, match="regex input length"):

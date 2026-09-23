@@ -650,7 +650,10 @@ def _write_atomic(path: Path, content: str) -> None:
             temporary_file.write(content)
             temporary_file.flush()
             os.fsync(temporary_file.fileno())
-        os.chmod(temporary_path, 0o644)
+        # Keep the staging file private until the atomic replacement. The
+        # generated destination is written by the current build user and does
+        # not require world-readable permissions during this window.
+        os.chmod(temporary_path, 0o600)
         os.replace(temporary_path, path)
     finally:
         try:
