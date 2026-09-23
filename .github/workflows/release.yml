@@ -19,9 +19,18 @@ jobs:
     permissions:
       contents: read
 
+  codeql:
+    name: Required CodeQL gate
+    uses: ./.github/workflows/codeql.yml
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      security-events: write
+
   build:
     name: Build and verify immutable artifacts
-    needs: quality
+    needs: [quality, codeql]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -93,7 +102,7 @@ jobs:
           path: release-candidate
 
       - name: Publish distributions and provenance attestations
-        uses: pypa/gh-action-pypi-publish@6733eb7d741f0b11ec6a39b58540dab7590f9b7d # v1.14.0
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
         with:
           packages-dir: release-candidate/dist/
           attestations: true
