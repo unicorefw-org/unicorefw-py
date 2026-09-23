@@ -14,7 +14,7 @@
 
 UniCoreFW is a compact, batteries-included utility library that provides chainable and static helper functions across arrays (lists), objects (dicts / nested structures), functions, strings, security utilities, templates, and optional cryptography helpers.
 
-> **Current version:** `1.1.5`
+> **Current version:** `1.2.0`
 
 ---
 
@@ -608,7 +608,7 @@ Run the branch-coverage gate before submitting changes:
 ```bash
 python -m pytest tests --cov=unicorefw --cov-branch \
   --cov-report=term-missing --cov-report=xml --cov-report=json \
-  --cov-fail-under=83
+  --cov-fail-under=95
 ```
 
 CI rejects regressions below the current verified 83% ratchet. The interim

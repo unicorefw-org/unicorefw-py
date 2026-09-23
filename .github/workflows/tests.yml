@@ -166,6 +166,7 @@ jobs:
         with:
           files: ./coverage.xml
           flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
           slug: unicorefw-org/unicorefw-py
           fail_ci_if_error: true
           use_oidc: true

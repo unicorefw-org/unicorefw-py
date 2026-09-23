@@ -197,6 +197,7 @@ def test_test_workflow_enforces_branch_coverage_ratchet():
     )
     assert "files: ./coverage.xml" in workflow
     assert "slug: unicorefw-org/unicorefw-py" in workflow
+    assert "token: ${{ secrets.CODECOV_TOKEN }}" in workflow
     assert "use_oidc: true" in workflow
     assert threshold_match is not None
     assert config_match is not None
